@@ -523,6 +523,7 @@ class LiveEngine:
         # 300x226 grayscale is shared with the ShotSegmenter instead of
         # being computed twice per frame (~3 ms/frame saved).
         prev_small = None
+        t = 0.0
         for _idx, t, frame in src:
             small = _small_gray(frame)
             if prev_small is not None and \
@@ -674,9 +675,11 @@ class LiveEngine:
 
         if spin is not None:
             ball.set_shot("other")
+            # End the spin at the last processed FRAME time (not the last
+            # chronology event, whose timing depends on OCR cadence — using
+            # it would corrupt the coverage/eff_fps statistics).
             self._finalize_spin(spin, ball, rotor,
-                                spin["events"][-1]["t"]
-                                if spin["events"] else 0.0,
+                                t if n_frames else 0.0,
                                 n_plunge_frames)
         report.n_frames = n_frames
         report.wall_s = time.perf_counter() - wall0
