@@ -1,0 +1,43 @@
+name: package-video
+# Repackages the Video-v1 release asset into git-fetchable chunks:
+# transcodes to 720p H.264 (analysis does not need 4K), then splits into
+# <95 MB parts committed to the orphan branch `video-chunks`.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download Video-v1 --pattern '*.mov' \
+            --output original.mov --repo "$GITHUB_REPOSITORY"
+          ls -la original.mov
+      - name: Transcode to 720p
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          ffprobe -v error -select_streams v:0 \
+            -show_entries stream=width,height,r_frame_rate,duration \
+            -of default=noprint_wrappers=1 original.mov || true
+          ffmpeg -y -i original.mov -vf "scale=-2:720" -c:v libx264 \
+            -preset veryfast -crf 26 -an -movflags +faststart video720.mp4
+          ls -la video720.mp4
+      - name: Split and push chunks branch
+        run: |
+          mkdir chunks
+          split -b 95m -d video720.mp4 chunks/video720.mp4.part.
+          sha256sum video720.mp4 chunks/* > chunks/SHA256SUMS
+          ls -la chunks
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan video-chunks
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          git add -f chunks
+          git commit -m "720p video chunks from release Video-v1"
+          git push -f origin video-chunks
