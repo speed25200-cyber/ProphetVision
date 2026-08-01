@@ -138,6 +138,7 @@ class Chronology:
         self.ocr = DigitOCR(templates_path)
         self.banner_period = float(banner_period)
         # countdown state
+        self._cd_reads: deque = deque(maxlen=120)  # (t, digit)
         self._cd_last_value: int | None = None
         self._cd_last_t: float = -1e9
         # bets_close state
@@ -208,12 +209,22 @@ class Chronology:
         digit, score = self.ocr.classify(glyph)
         if score < 0.70:
             return None
+        # Short majority vote (~0.25 s): a single-frame OCR flicker must
+        # not emit or skip a value (countdown steps are ~1 s apart, much
+        # faster than the result-marker persistence, hence a short window).
+        self._cd_reads.append((t, digit))
+        recent = [(tt, dd) for tt, dd in self._cd_reads if t - tt <= 0.25]
+        values = [dd for _, dd in recent]
+        modal = max(set(values), key=values.count)
+        if values.count(modal) < max(2, len(values) // 2):
+            self._cd_last_t = t
+            return None
         # Anti-duplicate: emit only when the value changes (or after a long
         # silence, i.e. a new spin).
-        if (digit != self._cd_last_value) or (t - self._cd_last_t > 20.0):
-            self._cd_last_value = digit
+        if (modal != self._cd_last_value) or (t - self._cd_last_t > 20.0):
+            self._cd_last_value = modal
             self._cd_last_t = t
-            return SpinEvent("countdown", t, {"seconds_left": digit,
+            return SpinEvent("countdown", t, {"seconds_left": modal,
                                               "score": round(score, 3)})
         self._cd_last_t = t
         return None
