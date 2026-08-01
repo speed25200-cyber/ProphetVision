@@ -8,3 +8,4 @@ dist/
 *.mp4
 scatter.json
 chunks/
+tests/artifacts/
