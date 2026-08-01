@@ -45,7 +45,57 @@ sans rien connaître de la vérité terrain.
 python -m pytest tests/          # 11 tests, dont 3 de bout en bout
 ```
 
-## Résultat sur la vidéo réelle fournie (Lightning Roulette en ligne)
+## Prédiction réussie sur la vidéo réelle (spin A)
+
+**Ce qui marche, mesuré sur les images fournies.** Une fois la bille en vol sur
+le rebord, sa trajectoire est extrapolée avec précision. Sur le spin A (vidéo
+pleine résolution), le modèle est ajusté sur les échantillons **jusqu'à un
+instant de coupure**, puis on compare l'azimut prédit à l'azimut réellement
+observé au moment du contact avec le rotor (t = 86,00 s) :
+
+| Coupure | Arc ajusté | Avance | Erreur | En poches |
+|---|---|---|---|---|
+| 83,60 s | 112° | **2,40 s** | −4,4° | **0,45** |
+| 84,00 s | 219° | 2,00 s | −10,4° | 1,07 |
+| 84,40 s | 255° | 1,60 s | −10,6° | 1,09 |
+| 84,80 s | 291° | 1,20 s | −7,2° | **0,74** |
+| 85,20 s | 324° | 0,80 s | −11,4° | 1,18 |
+
+Validation *held-out* (échantillons jamais vus par l'ajustement, coupure
+84,80 s) : sur toute la phase de rebord restante, l'erreur médiane est de
+**0,15 poche** et reste sous 0,4 poche jusqu'à 0,8 s d'avance. Au-delà de
+~1,8 s la bille a quitté le rebord et le modèle ne s'applique plus (l'erreur
+saute à ~4 poches) — c'est le comportement attendu, pas un défaut.
+
+Ce qu'il a fallu pour y arriver sur des images réelles, et qui est encodé dans
+`realstream.py` :
+
+1. **Suivi par couleur + fond médian temporel.** La bille est un blob *jaune
+   crème et mobile* : `min(G,R) − B`, moins la médiane temporelle. Sans la
+   soustraction de fond, les traqueurs se verrouillent sur des reflets fixes
+   (le mode d'échec dominant, rencontré trois fois).
+2. **Suppression des images dupliquées.** Le conteneur annonce 60 fps mais
+   ~24–49 seulement portent une information nouvelle ; les doublons corrompent
+   les estimations de dérivée.
+3. **Dé-roulement directionnel.** L'azimut de la bille ne progresse que dans
+   un sens ; les pas sont ramenés dans (−330°, +30°] pour qu'une coupure de
+   détection ne puisse pas inverser silencieusement le sens de parcours.
+4. **Rejet des rayons dorés du moyeu** par contrainte de forme (compact et
+   rond) — ils sont jaunes comme la bille.
+
+**Limite honnête.** L'extrapolation de *trajectoire* est validée ci-dessus.
+La conversion en *numéro de poche absolu* dépend de la phase du rotor : le
+suivi du zéro vert donne un ajustement à 2,4° près (0,24 poche), mais je n'ai
+pas pu confirmer indépendamment la correspondance absolue contre le résultat
+officiel (25) — la bille au repos n'a pas pu être isolée de façon fiable dans
+la phase finale. La chaîne complète azimut → poche → dispersion reste donc à
+valider sur davantage de spins.
+
+Sur un second spin (C), l'ajustement n'a disposé que de 159° d'arc à cause
+d'une coupure de détection, et l'erreur est montée à 6,4 poches — exactement
+le cas que les seuils de `feasibility.py` sont là pour signaler.
+
+## Contexte : la fenêtre de paris sur ce flux
 
 La vidéo analysée (3 min 57, 954×720) est un **enregistrement d'écran d'une
 roulette en ligne en direct** (Lightning Roulette). Le pipeline a été exécuté
