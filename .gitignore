@@ -7,3 +7,4 @@ dist/
 *.avi
 *.mp4
 scatter.json
+chunks/
