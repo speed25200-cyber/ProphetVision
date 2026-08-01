@@ -91,6 +91,18 @@ def cmd_analyze(args) -> int:
     return 0
 
 
+def cmd_audit(args) -> int:
+    from .feasibility import audit
+    cal = None
+    if args.center and args.radius:
+        cx, cy = (float(v) for v in args.center.split(","))
+        cal = Calibration(cx=cx, cy=cy, radius=float(args.radius))
+    rep = audit(args.video, wheel=_wheel(args), start_s=args.start,
+                end_s=args.end, calibration=cal)
+    print(json.dumps(rep.summary(), indent=2))
+    return 0 if rep.predictable else 1
+
+
 def cmd_calibrate(args) -> int:
     frames, fps = read_video(args.video, max_seconds=2.0)
     cal = Calibration.detect(frames)
@@ -128,6 +140,16 @@ def main(argv=None) -> int:
     a.add_argument("--outcome", type=int, default=None,
                    help="true final pocket, to update the scatter model")
     a.set_defaults(fn=cmd_analyze)
+
+    au = sub.add_parser("audit", help="can this video support prediction at all?")
+    au.add_argument("video")
+    au.add_argument("--start", type=float, default=0.0)
+    au.add_argument("--end", type=float, default=None)
+    au.add_argument("--wheel", choices=["european", "american"],
+                    default="european")
+    au.add_argument("--center", help="wheel center override 'cx,cy' (pixels)")
+    au.add_argument("--radius", help="wheel radius override (pixels)")
+    au.set_defaults(fn=cmd_audit)
 
     c = sub.add_parser("calibrate", help="detect wheel center/radius")
     c.add_argument("video")

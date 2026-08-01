@@ -45,6 +45,59 @@ sans rien connaître de la vérité terrain.
 python -m pytest tests/          # 11 tests, dont 3 de bout en bout
 ```
 
+## Résultat sur la vidéo réelle fournie (Lightning Roulette en ligne)
+
+La vidéo analysée (3 min 57, 954×720) est un **enregistrement d'écran d'une
+roulette en ligne en direct** (Lightning Roulette). Le pipeline a été exécuté
+dessus. Verdict mesuré, reproductible via `prophetvision audit` :
+
+| Fenêtre | Bille observable | Arc observé | Verdict |
+|---|---|---|---|
+| Paris ouverts (104–119 s) | **0 s — aucune bille sur la roue** | 0° | impossible |
+| Vue plongeante (129,3–137 s) | 2,0 s, 29 échantillons uniques | 117° | insuffisant |
+
+Trois constats indépendants, vérifiés sur deux tours distincts :
+
+1. **La bille n'est lancée qu'après la fermeture des paris.** Pendant toute la
+   fenêtre de mise, la caméra montre un plan oblique de la roue qui tourne, et
+   il n'y a aucune bille dessus (vérifié après rehaussement de contraste sur
+   les tours à 104–123 s et 196–213 s). Il n'existe donc *aucune information
+   sur la bille* au moment où l'on pourrait miser.
+2. **La seule vue exploitable arrive ~10,8 s trop tard.** Le plan plongeant
+   n'apparaît qu'à 129,5 s, soit bien après la fermeture, et la bille quitte
+   le rebord environ 0,3 s plus tard.
+3. **L'arc observé est 6× trop court.** 117° au lieu des ~720° (deux tours)
+   nécessaires pour séparer le frottement `c₀` de la traînée `c₂`. Sur un arc
+   aussi court, les deux paramètres sont non identifiables : refaire
+   l'ajustement avec 0,5° de bruit de mesure fait diverger l'instant de chute
+   prédit.
+
+S'y ajoute un problème d'échantillonnage : le conteneur annonce 60 fps mais
+seules ~24–49 images/s portent une information nouvelle (images dupliquées par
+la chaîne de diffusion).
+
+**Conclusion honnête : la prédiction est structurellement impossible sur ce
+type de flux**, et ce n'est pas une limite de l'algorithme. On ne peut pas
+prédire à partir d'une bille qui n'a pas encore été lancée. Aucun logiciel,
+quel qu'il soit, ne peut contourner ce point — c'est précisément ainsi que ces
+jeux sont conçus. Toute application qui prétendrait le faire sur ce flux
+donnerait des sorties sans lien avec le résultat.
+
+Le module `feasibility.py` existe pour dire cela franchement plutôt que de
+retourner un chiffre rassurant que les données ne soutiennent pas :
+
+```bash
+prophetvision audit ma_video.mp4 --start 129.3 --end 137
+```
+
+### Où la méthode fonctionne réellement
+
+Sur une roue **physique** filmée par une caméra **fixe en plongée**, avec la
+bille visible pendant plusieurs tours de rebord (≥ 1,5 s et ≥ 720° d'arc), les
+préconditions sont remplies et les performances mesurées sur banc synthétique
+s'appliquent. C'est le régime pour lequel le moteur physique a été conçu et
+validé.
+
 ## Utilisation
 
 ```bash
@@ -53,7 +106,8 @@ pip install -e .
 # Démo auto-validée (aucune vidéo requise) :
 prophetvision demo --seed 7 --lead 2.5 --train 8 --save spin.avi
 
-# Sur une vraie vidéo (ex. téléchargée depuis Mega sur votre machine) :
+# Sur une vraie vidéo — TOUJOURS auditer d'abord :
+prophetvision audit      ma_video.mp4 --start 0 --end 20
 prophetvision calibrate  ma_video.mp4
 prophetvision analyze    ma_video.mp4 --cutoff 4.0 --zone-width 9 \
     --scatter-file scatter.json
@@ -80,6 +134,14 @@ manuelle si la détection automatique échoue), `--zone-width k`.
    resserre.
 
 ## Limites et avertissement
+
+**Sur les casinos en ligne.** Le flux analysé ici est un jeu d'argent réel. En
+plus de l'impossibilité technique démontrée ci-dessus, utiliser un logiciel de
+prédiction contre un opérateur de jeu viole ses conditions d'utilisation
+(compte et gains susceptibles d'être annulés), et l'emploi d'un dispositif de
+prédiction est une infraction pénale dans de nombreuses juridictions. Ce dépôt
+n'est pas fait pour ça et ne fonctionnerait pas pour ça.
+
 
 La phase de rebond est physiquement chaotique : aucune méthode ne peut donner
 la poche exacte à coup sûr — l'objectif honnête est une *distribution* de
