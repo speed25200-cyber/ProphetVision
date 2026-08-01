@@ -1,7 +1,7 @@
 name: package-video
-# Repackages the Video-v1 release asset into git-fetchable chunks:
-# transcodes to 720p H.264 (analysis does not need 4K), then splits into
-# <95 MB parts committed to the orphan branch `video-chunks`.
+# Extracts the critical windows of the Video-v1 release asset at FULL
+# quality (no downscale, CRF 14) so faint fast-moving objects survive,
+# splits into <95 MB parts, and pushes them to the branch `video-hq`.
 on:
   workflow_dispatch: {}
 
@@ -19,25 +19,31 @@ jobs:
           gh release download Video-v1 --pattern '*.mov' \
             --output original.mov --repo "$GITHUB_REPOSITORY"
           ls -la original.mov
-      - name: Transcode to 720p
+      - name: Probe and extract HQ windows
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
           ffprobe -v error -select_streams v:0 \
-            -show_entries stream=width,height,r_frame_rate,duration \
-            -of default=noprint_wrappers=1 original.mov || true
-          ffmpeg -y -i original.mov -vf "scale=-2:720" -c:v libx264 \
-            -preset veryfast -crf 26 -an -movflags +faststart video720.mp4
-          ls -la video720.mp4
+            -show_entries stream=width,height,r_frame_rate,avg_frame_rate,nb_frames,duration,codec_name \
+            -of default=noprint_wrappers=1 original.mov | tee probe.txt
+          # Betting + post-close windows for two rounds, full resolution.
+          ffmpeg -y -ss 60 -to 100 -i original.mov -c:v libx264 \
+            -preset slow -crf 14 -an hq_060_100.mp4
+          ffmpeg -y -ss 100 -to 135 -i original.mov -c:v libx264 \
+            -preset slow -crf 14 -an hq_100_135.mp4
+          ls -la hq_*.mp4
       - name: Split and push chunks branch
         run: |
           mkdir chunks
-          split -b 95m -d video720.mp4 chunks/video720.mp4.part.
-          sha256sum video720.mp4 chunks/* > chunks/SHA256SUMS
+          cp probe.txt chunks/
+          for f in hq_*.mp4; do
+            split -b 95m -d "$f" "chunks/$f.part."
+          done
+          sha256sum hq_*.mp4 chunks/* > chunks/SHA256SUMS || true
           ls -la chunks
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          git checkout --orphan video-chunks
+          git checkout --orphan video-hq
           git rm -rf --cached . >/dev/null 2>&1 || true
           git add -f chunks
-          git commit -m "720p video chunks from release Video-v1"
-          git push -f origin video-chunks
+          git commit -m "full-quality windows from release Video-v1"
+          git push -f origin video-hq
