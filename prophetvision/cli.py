@@ -1,8 +1,11 @@
 """Command-line interface.
 
   prophetvision demo [--save spin.avi]        synthetic end-to-end demo
-  prophetvision analyze VIDEO [options]       predict from a real video
+  prophetvision analyze VIDEO [options]       predict from a real spin video
+  prophetvision audit VIDEO                   feasibility verdict for a stream
   prophetvision calibrate VIDEO               show detected wheel geometry
+  prophetvision live VIDEO [options]          real-time session (SPEC F-H)
+  prophetvision history VIDEO                 dump the OCR history banner
 """
 
 from __future__ import annotations
@@ -111,6 +114,49 @@ def cmd_calibrate(args) -> int:
     return 0
 
 
+def cmd_live(args) -> int:
+    """Full real-time session (SPEC.md sections F-H).  Streams the video
+    (never buffers it) and prints the session summary as JSON."""
+    from .live import LiveEngine
+    engine = LiveEngine(wheel=_wheel(args), realtime=args.realtime,
+                        zone_width=args.zone_width,
+                        max_seconds=args.max_seconds)
+    if args.verbose:
+        def on_event(ev):
+            print("event " + json.dumps(ev, default=str), file=sys.stderr)
+    else:
+        on_event = None
+    report = engine.run(args.video, on_event=on_event)
+    if args.json:
+        report.save(args.json)
+        print(f"session JSON -> {args.json}", file=sys.stderr)
+    if args.report:
+        from .dashboard import render_spin_report
+        frames_dir = os.path.splitext(args.report)[0] + "_frames"
+        render_spin_report(report, args.video, args.report, frames_dir)
+        print(f"rapport HTML -> {args.report} (frames: {frames_dir})",
+              file=sys.stderr)
+    print(json.dumps(report.summary(), indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_history(args) -> int:
+    """Dump the OCR history banner over time (validation tool, SPEC H).
+    Streams; prints one JSON line per banner change."""
+    from .chronology import Chronology
+    from .streaming import FrameSource, dedup_times
+    chrono = Chronology(banner_period=args.period)
+    src = FrameSource(args.video)
+    for t, frame in dedup_times(src):
+        if args.max_seconds is not None and t > args.max_seconds:
+            break
+        for ev in chrono.process(t, frame):
+            if ev.kind == "banner":
+                print(json.dumps({"t": round(t, 2),
+                                  "numbers": ev.detail["numbers"]}))
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="prophetvision", description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -154,6 +200,28 @@ def main(argv=None) -> int:
     c = sub.add_parser("calibrate", help="detect wheel center/radius")
     c.add_argument("video")
     c.set_defaults(fn=cmd_calibrate)
+
+    li = sub.add_parser("live", help="real-time session: tracking, "
+                        "predictions, chronology, HTML/JSON report")
+    li.add_argument("video")
+    li.add_argument("--wheel", choices=["european", "american"],
+                    default="european")
+    li.add_argument("--report", help="write the HTML spin report here")
+    li.add_argument("--json", help="write the full session JSON here")
+    li.add_argument("--zone-width", type=int, default=9)
+    li.add_argument("--realtime", action="store_true",
+                    help="do not consume the stream faster than real time")
+    li.add_argument("--max-seconds", type=float, default=None)
+    li.add_argument("--verbose", action="store_true",
+                    help="print events to stderr as they happen")
+    li.set_defaults(fn=cmd_live)
+
+    hi = sub.add_parser("history", help="dump the OCR history banner")
+    hi.add_argument("video")
+    hi.add_argument("--period", type=float, default=0.5,
+                    help="seconds between banner reads")
+    hi.add_argument("--max-seconds", type=float, default=None)
+    hi.set_defaults(fn=cmd_history)
 
     args = ap.parse_args(argv)
     return args.fn(args)
