@@ -45,57 +45,7 @@ sans rien connaître de la vérité terrain.
 python -m pytest tests/          # 11 tests, dont 3 de bout en bout
 ```
 
-## Prédiction réussie sur la vidéo réelle (spin A)
-
-**Ce qui marche, mesuré sur les images fournies.** Une fois la bille en vol sur
-le rebord, sa trajectoire est extrapolée avec précision. Sur le spin A (vidéo
-pleine résolution), le modèle est ajusté sur les échantillons **jusqu'à un
-instant de coupure**, puis on compare l'azimut prédit à l'azimut réellement
-observé au moment du contact avec le rotor (t = 86,00 s) :
-
-| Coupure | Arc ajusté | Avance | Erreur | En poches |
-|---|---|---|---|---|
-| 83,60 s | 112° | **2,40 s** | −4,4° | **0,45** |
-| 84,00 s | 219° | 2,00 s | −10,4° | 1,07 |
-| 84,40 s | 255° | 1,60 s | −10,6° | 1,09 |
-| 84,80 s | 291° | 1,20 s | −7,2° | **0,74** |
-| 85,20 s | 324° | 0,80 s | −11,4° | 1,18 |
-
-Validation *held-out* (échantillons jamais vus par l'ajustement, coupure
-84,80 s) : sur toute la phase de rebord restante, l'erreur médiane est de
-**0,15 poche** et reste sous 0,4 poche jusqu'à 0,8 s d'avance. Au-delà de
-~1,8 s la bille a quitté le rebord et le modèle ne s'applique plus (l'erreur
-saute à ~4 poches) — c'est le comportement attendu, pas un défaut.
-
-Ce qu'il a fallu pour y arriver sur des images réelles, et qui est encodé dans
-`realstream.py` :
-
-1. **Suivi par couleur + fond médian temporel.** La bille est un blob *jaune
-   crème et mobile* : `min(G,R) − B`, moins la médiane temporelle. Sans la
-   soustraction de fond, les traqueurs se verrouillent sur des reflets fixes
-   (le mode d'échec dominant, rencontré trois fois).
-2. **Suppression des images dupliquées.** Le conteneur annonce 60 fps mais
-   ~24–49 seulement portent une information nouvelle ; les doublons corrompent
-   les estimations de dérivée.
-3. **Dé-roulement directionnel.** L'azimut de la bille ne progresse que dans
-   un sens ; les pas sont ramenés dans (−330°, +30°] pour qu'une coupure de
-   détection ne puisse pas inverser silencieusement le sens de parcours.
-4. **Rejet des rayons dorés du moyeu** par contrainte de forme (compact et
-   rond) — ils sont jaunes comme la bille.
-
-**Limite honnête.** L'extrapolation de *trajectoire* est validée ci-dessus.
-La conversion en *numéro de poche absolu* dépend de la phase du rotor : le
-suivi du zéro vert donne un ajustement à 2,4° près (0,24 poche), mais je n'ai
-pas pu confirmer indépendamment la correspondance absolue contre le résultat
-officiel (25) — la bille au repos n'a pas pu être isolée de façon fiable dans
-la phase finale. La chaîne complète azimut → poche → dispersion reste donc à
-valider sur davantage de spins.
-
-Sur un second spin (C), l'ajustement n'a disposé que de 159° d'arc à cause
-d'une coupure de détection, et l'erreur est montée à 6,4 poches — exactement
-le cas que les seuils de `feasibility.py` sont là pour signaler.
-
-## Contexte : la fenêtre de paris sur ce flux
+## Résultat sur la vidéo réelle fournie (Lightning Roulette en ligne)
 
 La vidéo analysée (3 min 57, 954×720) est un **enregistrement d'écran d'une
 roulette en ligne en direct** (Lightning Roulette). Le pipeline a été exécuté
@@ -233,6 +183,32 @@ faite *avant* la chute de la bille, comme en conditions réelles.
 
 Options utiles : `--wheel american`, `--center cx,cy --radius r` (calibration
 manuelle si la détection automatique échoue), `--zone-width k`.
+
+### Session temps réel (v2, Gravity Auto Roulette)
+
+```bash
+# Session complète en streaming (jamais la vidéo entière en mémoire) :
+prophetvision live hq_060_100.mp4 --report session.html --json session.json
+prophetvision live flux.mp4 --realtime --verbose   # simule le direct
+prophetvision history hq_060_100.mp4               # bannière d'historique OCR
+```
+
+Le moteur (`live.py`) chaîne : lecture streaming dédupliquée (~50 fps
+réels) → segmentation des plans → calibration plongée → suivi bille
+(unwrap polaire + Kalman) et rotor (zéro vert absolu) → dès 1,2 s d'arc de
+piste, prédiction de zone rafraîchie ~2×/s (chute estimée par **cinématique
+linéaire locale** — sur la queue de spin mesurée, ω ≈ 110→55 °/s est
+quasi-linéaire) → lecture OCR du résultat → auto-apprentissage du scatter
+de rebond ET de la vitesse de chute (ω_drop ≈ 55-65 °/s sur cette roue, pas
+le défaut v1). Le rapport HTML (`dashboard.py`) affiche par spin : roue
+avec probabilités par poche, zone prédite (9 poches) et zone adaptative
+(dimensionnée à ~67 % de masse), courbes ω(t), chronologie, verdicts
+hit/miss bruts et corrigés, frames annotées.
+
+**Honnêteté (mesuré sur le flux BeterLive)** : la bille est lancée ~10 s
+APRÈS la fermeture des paris — la prédiction n'est donc pas jouable en mise
+sur ce flux ; le rapport affiche ce gap et l'avance réelle
+prédiction → chute (~2 s) plutôt qu'une promesse non vérifiable.
 
 ## Adapter à votre vidéo
 
