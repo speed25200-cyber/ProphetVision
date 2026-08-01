@@ -25,11 +25,13 @@ jobs:
           ffprobe -v error -select_streams v:0 \
             -show_entries stream=width,height,r_frame_rate,avg_frame_rate,nb_frames,duration,codec_name \
             -of default=noprint_wrappers=1 original.mov | tee probe.txt
-          # Betting + post-close windows for two rounds, full resolution.
+          # Full-resolution windows: rounds A/B and the final spin C.
           ffmpeg -y -ss 60 -to 100 -i original.mov -c:v libx264 \
-            -preset slow -crf 14 -an hq_060_100.mp4
+            -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an hq_060_100.mp4
           ffmpeg -y -ss 100 -to 135 -i original.mov -c:v libx264 \
-            -preset slow -crf 14 -an hq_100_135.mp4
+            -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an hq_100_135.mp4
+          ffmpeg -y -ss 210 -to 237.5 -i original.mov -c:v libx264 \
+            -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an hq_210_237.mp4
           ls -la hq_*.mp4
       - name: Split and push chunks branch
         run: |
