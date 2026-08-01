@@ -211,9 +211,15 @@ class ShotSegmenter:
         return "other"
 
     # ----------------------------------------------------------------- public
-    def process(self, frame: np.ndarray) -> str:
-        """Classify one frame, with cut detection + hysteresis."""
-        small = _small_gray(frame)
+    def process(self, frame: np.ndarray,
+                small: np.ndarray | None = None) -> str:
+        """Classify one frame, with cut detection + hysteresis.
+
+        ``small`` optionally provides the precomputed 300x226 grayscale of
+        ``frame`` (e.g. shared with dedup_times in a streaming loop) to
+        avoid computing it twice per frame."""
+        if small is None:
+            small = _small_gray(frame)
         cut = False
         if self._prev_small is not None:
             cut = _frame_diff(small, self._prev_small) > self.cut_thresh
