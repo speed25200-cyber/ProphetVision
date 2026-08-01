@@ -132,8 +132,9 @@ class SyntheticSpin:
         theta_deg, r_frac = ball_state
         bx = cx + R * r_frac * np.cos(np.radians(theta_deg))
         by = cy + R * r_frac * np.sin(np.radians(theta_deg))
+        # Cream-yellow like a real roulette ball (exercises color trackers).
         cv2.circle(img, (int(bx), int(by)), max(3, self.size // 120),
-                   (250, 250, 250), -1)
+                   (150, 230, 235), -1)
         return img
 
 

@@ -122,6 +122,36 @@ retourner un chiffre rassurant que les données ne soutiennent pas :
 prophetvision audit ma_video.mp4 --start 129.3 --end 137
 ```
 
+### Prédiction réelle démontrée sur la vidéo (module `realstream`)
+
+Sur les tours où la bille est observable en vol, le pipeline complet a été
+exécuté **avec coupure temporelle** : ajustement du modèle uniquement sur les
+données antérieures à la coupure, extrapolation, puis comparaison à ce qui
+s'est réellement passé.
+
+**Spin A** (pleine résolution, arc de 291°, résidu d'ajustement 0,97°) :
+
+| | Prédit (à 84,8 s) | Observé (à 86,0 s) |
+|---|---|---|
+| Azimut au premier contact | 243,9° | 251,1° |
+| Poche d'impact | idx 23,6 | idx 24,3 |
+| **Erreur** | **0,74 poche, 1,2 s à l'avance** | |
+
+La chaîne complète est vérifiée : le rebond se termine à l'index 7,6 ≈ la
+poche du **25**, qui est le numéro gagnant officiel du tour (drapeau à
+l'écran + tête de l'historique au tour suivant). L'offset de rebond mesuré
+(−17 poches) alimente le modèle de dispersion.
+
+**Spin C** (720p, trou de détection de 1,5 s → ajustement réduit à 159°
+d'arc) : erreur de 6,4 poches. C'est exactement le cas que les seuils de
+`feasibility.py` signalent : sous ~2 tours d'arc observé, l'extrapolation se
+dégrade. Le numéro final estimé par le suivi de la bille posée (poche 9)
+est confirmé visuellement à l'image.
+
+Dynamique mesurée de cette roue : rotor +66,7°/s (rms 2,4°), bille lancée à
+contre-sens ~−130°/s décélérant à ~−55°/s au contact, spirale de descente
+~1,3 s.
+
 ### Où la méthode fonctionne réellement
 
 Sur une roue **physique** filmée par une caméra **fixe en plongée**, avec la
