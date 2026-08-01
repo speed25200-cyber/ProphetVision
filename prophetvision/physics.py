@@ -110,9 +110,17 @@ class BallDecayModel:
         x = np.array([np.log(self.c0), np.log(self.c2), self.omega_ref])
 
         def residuals(x):
-            c0, c2, om = np.exp(x[0]), np.exp(x[1]), x[2]
-            span = self._span(t, c0, c2, om)
+            # Real tracks (short arcs, tracker glitches) can drive the search
+            # into overflow; clamp the log-parameters to a physical range so a
+            # bad fit degrades into a large residual rather than inf/nan.
+            lc0 = float(np.clip(x[0], -20.0, 20.0))
+            lc2 = float(np.clip(x[1], -40.0, 5.0))
+            c0, c2, om = np.exp(lc0), np.exp(lc2), max(x[2], 1.0)
+            with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+                span = self._span(t, c0, c2, om)
             pred = self.direction * span
+            if not np.all(np.isfinite(pred)):
+                return np.full(len(t), 1e6), float(self.theta_ref)
             theta_ref = float(np.mean(th - pred))
             return (theta_ref + pred) - th, theta_ref
 
@@ -146,8 +154,9 @@ class BallDecayModel:
                 lam *= 10.0
                 if lam > 1e6:
                     break
-        self.c0, self.c2 = float(np.exp(x[0])), float(np.exp(x[1]))
-        self.omega_ref = float(x[2])
+        self.c0 = float(np.exp(np.clip(x[0], -20.0, 20.0)))
+        self.c2 = float(np.exp(np.clip(x[1], -40.0, 5.0)))
+        self.omega_ref = float(max(x[2], 1.0))
         self.theta_ref = float(theta_ref)
 
 

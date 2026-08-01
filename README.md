@@ -49,28 +49,36 @@ python -m pytest tests/          # 11 tests, dont 3 de bout en bout
 
 La vidéo analysée (3 min 57, 954×720) est un **enregistrement d'écran d'une
 roulette en ligne en direct** (Lightning Roulette). Le pipeline a été exécuté
-dessus. Verdict mesuré, reproductible via `prophetvision audit` :
+dessus. Verdict mesuré, reproductible via `prophetvision audit`.
 
-| Fenêtre | Bille observable | Arc observé | Verdict |
-|---|---|---|---|
-| Paris ouverts (104–119 s) | **0 s — aucune bille sur la roue** | 0° | impossible |
-| Vue plongeante (129,3–137 s) | 2,0 s, 29 échantillons uniques | 117° | insuffisant |
+La bille **est** bien présente et rapide, et elle est traçable pendant
+plusieurs secondes dans les plans plongeants les plus longs — un suivi dédié
+(signature jaune crème, recherche locale par continuité) la suit sur 345°
+d'arc. Ce qui bloque n'est donc pas la détection, mais la **chronologie**.
 
-Trois constats indépendants, vérifiés sur deux tours distincts :
+Chronologie mesurée, sur deux tours indépendants :
 
-1. **La bille n'est lancée qu'après la fermeture des paris.** Pendant toute la
-   fenêtre de mise, la caméra montre un plan oblique de la roue qui tourne, et
-   il n'y a aucune bille dessus (vérifié après rehaussement de contraste sur
-   les tours à 104–123 s et 196–213 s). Il n'existe donc *aucune information
-   sur la bille* au moment où l'on pourrait miser.
-2. **La seule vue exploitable arrive ~10,8 s trop tard.** Le plan plongeant
-   n'apparaît qu'à 129,5 s, soit bien après la fermeture, et la bille quitte
-   le rebord environ 0,3 s plus tard.
-3. **L'arc observé est 6× trop court.** 117° au lieu des ~720° (deux tours)
-   nécessaires pour séparer le frottement `c₀` de la traînée `c₂`. Sur un arc
-   aussi court, les deux paramètres sont non identifiables : refaire
-   l'ajustement avec 0,5° de bruit de mesure fait diverger l'instant de chute
-   prédit.
+| | Tour A | Tour B |
+|---|---|---|
+| Fin du compte à rebours | ~71 s | ~119 s |
+| « No more bets » affiché | 72 s | — |
+| Bille observable à partir de | **84 s** | **129,7 s** |
+| Retard après fermeture | **+12 s** | **+10,8 s** |
+
+**La bille n'est lancée qu'après la fermeture des paris.** Pendant toute la
+fenêtre de mise, la caméra montre un plan oblique de la roue qui tourne à
+vide. Vérifié de quatre façons indépendantes : rehaussement de contraste,
+carte d'écart-type temporel (activité uniquement au moyeu, aucun anneau
+orbital), carte max−médiane, et analyse fréquentielle par pixel sur la bande
+1–6 Hz (le pic vient des rayons du moyeu, pas d'une orbite). Il n'existe donc
+*aucune information sur la bille* au moment où l'on peut miser.
+
+Et même en ignorant ce point, l'arc observable reste insuffisant : 345° au
+lieu des ~720° (deux tours) nécessaires pour séparer le frottement `c₀` de la
+traînée `c₂`. Sur un arc aussi court les deux paramètres sont non
+identifiables ; l'ajustement refait avec 0,5° de bruit de mesure donne une
+incertitude d'atterrissage de **±12 poches sur 37** — soit l'équivalent du
+hasard.
 
 S'y ajoute un problème d'échantillonnage : le conteneur annonce 60 fps mais
 seules ~24–49 images/s portent une information nouvelle (images dupliquées par
