@@ -80,6 +80,30 @@ identifiables ; l'ajustement refait avec 0,5° de bruit de mesure donne une
 incertitude d'atterrissage de **±12 poches sur 37** — soit l'équivalent du
 hasard.
 
+### Contre-vérification en pleine résolution (hypothèse « bille très rapide »)
+
+L'hypothèse qu'une bille rapide, étalée par le flou de mouvement, ait été
+effacée par la compression 720p a été testée en ré-extrayant les fenêtres
+critiques **à la résolution d'origine (1206×910, CRF 14)** via le workflow
+`package-video.yml` (branche `video-hq`). Résultats :
+
+- Cartes espace-temps le long de l'ellipse de la vue latérale : les seules
+  stries sont la texture du rotor (~60°/s en azimut d'ellipse) et les
+  graphismes des multiplicateurs. Aucune strie rapide en sens opposé.
+- Détecteur de traînées (une bille à 2-5 tr/s laisse un étalement tangentiel
+  de 50-100 px par image à cette résolution) : les seules traînées détectées
+  sont les bras de la tourelle centrale et deux reflets fixes qui
+  scintillent toujours aux mêmes coordonnées. Aucune traînée ne balaie la
+  piste.
+- Lecture directe des images : pendant les paris les numéros du rotor sont
+  nets (rotor lent) ; après fermeture ils sont flous de mouvement — la roue
+  est accélérée à ce moment-là. C'est ce « spin-up », spectaculaire à
+  l'écran, qui donne l'impression visuelle d'un objet très rapide sur la
+  demi-ellipse. La mesure montre que c'est la roue elle-même, pas une bille.
+
+La bille n'apparaît qu'ensuite, lancée pendant l'affichage des
+multiplicateurs, 10 à 13 s après la fermeture des paris.
+
 S'y ajoute un problème d'échantillonnage : le conteneur annonce 60 fps mais
 seules ~24–49 images/s portent une information nouvelle (images dupliquées par
 la chaîne de diffusion).
