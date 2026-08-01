@@ -1,4 +1,12 @@
-"""Embedded copy of digit_templates.npz (base64) for source-only distributions."""
+"""Embedded digit templates for prophetvision.chronology (SPEC D).
+
+The template npz (30 real glyph crops from the Gravity Auto Roulette
+videos, 24x36 canonical float32 arrays + digit labels) is stored
+base64-encoded so the package works without the binary data file.
+Regenerate with: base64 of prophetvision/data/digit_templates.npz.
+"""
+from __future__ import annotations
+
 import base64
 
 NPZ_B64 = (
@@ -153,6 +161,7 @@ NPZ_B64 = (
     "AACAAQAAAABYLm5weVBLAQItAy0AAAAIAAAAIQC8gjAEYwAAAHABAAAFAAAAAAAAAAAAAACAATQg"
     "AAB5Lm5weVBLBQYAAAAAAgACAGYAAADOIAAAAAA="
 )
+
 
 def npz_bytes() -> bytes:
     return base64.b64decode(NPZ_B64)
