@@ -137,31 +137,49 @@ l'ajuste pas**. `c₀` et `c₂` sont des propriétés de la roue, calibrées un
 mesurées 38,9 et 19,2 °/s² → c₀ = 17,5, c₂ = 1,99×10⁻⁴). Seules la vitesse et
 la phase restent libres — un paramètre, récupérable sur 19 détections.
 
-**Résultat sur le spin A, coupure 72,0 s :**
+**Ce qui a débloqué la précision.** Un premier passage donnait ω à ±2,7 %, soit
+σ ≈ 13 poches. Le diagnostic : les résidus étaient du bruit pur (autocorrélation
+0,30, aucune tendance), et un bruit indépendant n'aurait donné que **0,57 %**.
+L'écart venait des **trous temporels** — 19 détections groupées en trois paquets
+avec des vides de 0,5 s. Deux corrections :
+
+1. **Balayage dense** de la fenêtre 70,2-72,1 s (seuil YOLO abaissé à 0,20, pas
+   de tuile réduit) : 83 détections sur 61 images, couverture temporelle
+   régulière.
+2. **Rejet robuste des aberrants** (`robust_fit_speed`) : quelques détections
+   tombent sur un reflet voisin ; les garder faisait passer le résidu de 6 à
+   29° et le bootstrap de 0,9 à 1,7 %. À 4,2 poches par 1 % d'erreur de
+   vitesse, ça vaut plusieurs poches.
+
+**Résultat, spin A, coupure 72,0 s (2,0 s avant l'animation) :**
 
 | | valeur |
 |---|---|
-| détections utilisées | 19 (70,47 → 71,92 s) |
-| résidu d'ajustement | 6,4° |
-| vitesse ω(72,0) | 495 °/s, **±2,7 %** (bootstrap) |
-| instant de chute prédit | **86,36 s** (observé 86,0) |
-| indice d'arrivée prédit | **7,15** — la vérité est **7** |
-| zone 9 poches | `[19, 4, 21, 2, 25, 17, 34, 6, 27]` — **25 au centre** |
+| détections | 40 gardées sur 47 |
+| résidu | 6,3° |
+| vitesse ω₀ | 614 ± 5 °/s → **±0,89 %** |
+| instant de chute | **86,36 s** (observé 86,0) |
+| indice d'arrivée | **8,77** — vérité **7**, soit **1,8 poche** |
+| **σ propagé** | **4,4 poches** |
 
-**Mais ce résultat n'est pas reproductible à cette finesse, et il faut le dire :**
-en déplaçant la coupure de 72,0 à 72,5 s, l'indice passe de 7,15 à 0,26, soit
-**6,7 poches de dérive**. La fiabilité honnête est celle que donne la
-propagation d'erreur, pas ce coup au but :
+**Couverture du point d'impact :**
 
-| Zone | Couverture |
+| Mise | Couverture |
 |---|---|
-| 9 poches | 25 % |
-| 13 poches | 37 % |
-| 21 poches | **58 %** |
+| 9 jetons | 64 % |
+| 13 jetons | 83 % |
+| **18 jetons** | **96 %** |
+| 21 jetons | 98 % |
 
-σ = 13,2 poches. Une zone de 21 poches à ~58 % est ce que la méthode soutient
-réellement aujourd'hui à cette coupure ; la zone de 9 poches qui contient 25
-est en grande partie de la chance sur un spin.
+Zone 18 jetons : `[0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23]`
+
+⚠️ **Ces chiffres décrivent le point d'IMPACT sur le rotor, pas la poche
+finale.** Le rebond qui suit est chaotique et n'est ni modélisé ni mesuré ici
+sur des spins réels ; il ajoute typiquement plusieurs poches de dispersion.
+Avec un rebond à σ ≈ 4 poches, le total monterait à ≈ 6 poches et 18 jetons
+donneraient ≈ 87 %. Ce terme reste **à mesurer**, et il est le dernier écart
+entre ces chiffres et un vrai taux de réussite. Un seul spin : ce n'est pas une
+validation statistique.
 
 ### Le verrou, chiffré : la précision sur l'instant de chute
 

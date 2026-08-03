@@ -126,6 +126,51 @@ class EarlyPrediction:
         return float(np.mean(d <= half))
 
 
+def robust_fit_speed(t, theta_unwrapped, decay: WheelDecay,
+                     iterations: int = 4, clip_sigma: float = 2.5,
+                     min_keep: int = 10):
+    """Fit the speed, discarding detections the model cannot explain.
+
+    On real footage a handful of detections land on a reflection or a
+    neighbouring feature; left in, they inflated the fitted residual from 6 to
+    29 degrees and the bootstrap spread on the speed from 0.9% to 1.7%. Since
+    the landing error is about 4.2 pockets per 1% of speed error, that
+    difference is worth several pockets, so the outliers are removed rather
+    than absorbed.
+
+    Returns ``(residual_deg, omega0, phase_offset, keep_mask)``.
+    """
+    t = np.asarray(t, dtype=float)
+    th = np.asarray(theta_unwrapped, dtype=float)
+    keep = np.ones(len(t), dtype=bool)
+    resid = omega0 = offset = None
+    for _ in range(iterations):
+        resid, omega0, offset = fit_speed(t[keep], th[keep], decay)
+        pred = _integrate_to(t, omega0, decay) + offset
+        err = th - pred
+        scale = float(np.std(err[keep]))
+        new_keep = np.abs(err) < clip_sigma * max(scale, 1.0)
+        if new_keep.sum() < min_keep or np.array_equal(new_keep, keep):
+            break
+        keep = new_keep
+    resid, omega0, offset = fit_speed(t[keep], th[keep], decay)
+    return resid, omega0, offset, keep
+
+
+def _integrate_to(times, omega0: float, decay: WheelDecay, dt: float = 0.002):
+    """Cumulative azimuth travel at each requested time."""
+    times = np.asarray(times, dtype=float)
+    w, travel, tt = float(omega0), 0.0, float(times[0])
+    out = []
+    for target in times:
+        while tt < target - 1e-9:
+            w -= (decay.c0 + decay.c2 * w * w) * dt
+            travel -= w * dt
+            tt += dt
+        out.append(travel)
+    return np.asarray(out)
+
+
 def fit_speed(t, theta_unwrapped, decay: WheelDecay,
               omega_grid=np.arange(300.0, 1200.0, 1.0)):
     """Fit the single free speed parameter with the decay law held fixed."""
@@ -180,7 +225,8 @@ def predict_early(detections, cutoff: float, decay: WheelDecay,
         raise RuntimeError(f"only {len(t)} detections after static rejection")
     th = unwrap_predictive(t, az, direction=-1)
 
-    resid, omega0, offset = fit_speed(t, th, decay)
+    resid, omega0, offset, keep = robust_fit_speed(t, th, decay)
+    t, th = t[keep], th[keep]
 
     rng = np.random.default_rng(seed)
     boots = []

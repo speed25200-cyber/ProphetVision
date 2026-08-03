@@ -68,3 +68,35 @@ def test_zone_and_coverage_are_consistent():
     assert p.coverage(9) == pytest.approx(1.0)   # all draws at the centre
     wide, narrow = p.coverage(21), p.coverage(3)
     assert wide >= narrow
+
+
+def test_robust_fit_discards_outliers_and_tightens_the_speed():
+    """Outlier detections must not be absorbed: at ~4.2 pockets per 1% of
+    speed error, letting them in costs several pockets of landing accuracy."""
+    from prophetvision.earlyside import robust_fit_speed, _integrate_to
+    d = WheelDecay(c0=17.5, c2=2.0e-4)
+    true_w = 615.0
+    t = np.arange(0.0, 1.5, 0.03)
+    th = _integrate_to(t, true_w, d) + 40.0
+    rng = np.random.default_rng(0)
+    th = th + rng.normal(0, 3.0, len(t))
+    th[5] += 120.0            # detections that landed on something else
+    th[17] -= 95.0
+    th[26] += 140.0
+
+    naive_resid, naive_w, _ = fit_speed(t, th, d)
+    resid, w0, _, keep = robust_fit_speed(t, th, d)
+
+    assert keep.sum() >= len(t) - 6
+    assert not keep[[5, 17, 26]].any(), "the injected outliers were kept"
+    assert resid < naive_resid / 2.0
+    assert abs(w0 - true_w) < abs(naive_w - true_w) + 1e-9
+    assert abs(w0 - true_w) < 12.0, w0
+
+
+def test_integrate_to_is_monotone_in_travel():
+    from prophetvision.earlyside import _integrate_to
+    d = WheelDecay(c0=17.5, c2=2.0e-4)
+    t = np.linspace(0.0, 1.0, 20)
+    tr = _integrate_to(t, 600.0, d)
+    assert np.all(np.diff(tr) < 0)          # azimuth decreases throughout
