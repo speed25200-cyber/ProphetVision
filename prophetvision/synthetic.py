@@ -38,6 +38,40 @@ class SyntheticSpin:
     scatter_sigma_pockets: float = 1.6
     seed: int = 0
     post_land_time: float = 0.6
+    # --- oblique ("side view") rendering ------------------------------
+    # 0 keeps the top-down render. Otherwise the wheel plane is projected as
+    # seen from `elevation_deg` above it, and the frame is dimmed and noised
+    # to reproduce the low-SNR regime of a wide side-view shot, where
+    # per-frame blob detection of the ball fails.
+    elevation_deg: float = 0.0
+    side_gain: float = 0.45
+    side_noise: float = 6.0
+
+    def _oblique_H(self) -> np.ndarray:
+        """Homography of the wheel plane seen from `elevation_deg`."""
+        e = np.radians(max(self.elevation_deg, 1e-3))
+        s = self.size
+        c = s / 2.0
+        # Scaled-orthographic tilt about the image x axis, plus a mild
+        # perspective term so the near rim is larger than the far rim.
+        k = 0.35 * np.cos(e)
+        H = np.array([
+            [1.0, 0.0, 0.0],
+            [0.0, np.sin(e), 0.0],
+            [0.0, k / s, 1.0],
+        ], dtype=np.float64)
+        # keep the wheel centred
+        T1 = np.array([[1, 0, -c], [0, 1, -c], [0, 0, 1]], dtype=np.float64)
+        T2 = np.array([[1, 0, c], [0, 1, c], [0, 0, 1]], dtype=np.float64)
+        return T2 @ H @ T1
+
+    def _to_oblique(self, img: np.ndarray, rng) -> np.ndarray:
+        warped = cv2.warpPerspective(img, self._oblique_H(),
+                                     (self.size, self.size),
+                                     flags=cv2.INTER_LINEAR)
+        out = warped.astype(np.float32) * self.side_gain
+        out += rng.normal(0.0, self.side_noise, out.shape)
+        return np.clip(out, 0, 255).astype(np.uint8)
 
     def simulate(self):
         """Returns (frames, times, truth). Frames are BGR uint8."""
@@ -105,10 +139,28 @@ class SyntheticSpin:
         stride = 4
         frames, frame_times = [], []
         for i in range(0, len(times), stride):
-            frames.append(self._render(ball_states[i], rotor_states[i],
-                                       cx, cy, R, sector))
+            img = self._render(ball_states[i], rotor_states[i],
+                               cx, cy, R, sector)
+            if self.elevation_deg > 0:
+                img = self._to_oblique(img, rng)
+            frames.append(img)
             frame_times.append(times[i])
         return frames, np.asarray(frame_times), truth
+
+    def oblique_mapping(self):
+        """(r_frac, theta_deg) -> image pixel, matching `elevation_deg`."""
+        H = self._oblique_H()
+        c = self.size / 2.0
+        R = self.size * 0.45
+
+        def to_image(r_frac, theta_deg):
+            th = np.radians(np.asarray(theta_deg, dtype=float))
+            x = c + R * np.asarray(r_frac) * np.cos(th)
+            y = c + R * np.asarray(r_frac) * np.sin(th)
+            den = H[2, 0] * x + H[2, 1] * y + H[2, 2]
+            return ((H[0, 0] * x + H[0, 1] * y + H[0, 2]) / den,
+                    (H[1, 0] * x + H[1, 1] * y + H[1, 2]) / den)
+        return to_image
 
     # ------------------------------------------------------------------
     def _render(self, ball_state, phi, cx, cy, R, sector) -> np.ndarray:

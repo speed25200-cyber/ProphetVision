@@ -95,6 +95,49 @@ Sur un second spin (C), l'ajustement n'a disposé que de 159° d'arc à cause
 d'une coupure de détection, et l'erreur est montée à 6,4 poches — exactement
 le cas que les seuils de `feasibility.py` sont là pour signaler.
 
+## Vue latérale : le détecteur était aveugle — correction méthodologique
+
+Une conclusion négative n'a de valeur que si le détecteur est capable de voir
+ce qu'il cherche. Ce contrôle, longtemps omis, change tout.
+
+**Contrôle de cécité.** Sur 78–81,4 s la caméra est en vue latérale et la bille
+est *certainement* présente : elle apparaît à 82,07 s, juste après la coupure
+caméra mesurée à 81,467 s. La carte max−médiane n'y montre **aucun arc**. Le
+détecteur est donc aveugle en vue latérale — et tous les résultats négatifs
+obtenus avec lui dans cette vue (y compris « pas de bille pendant les paris »)
+sont **sans valeur**.
+
+**Outil construit en réponse** — `vmf.py`, filtrage adapté en vitesse
+(*track-before-detect*). On ne seuille jamais une image isolée : on postule une
+trajectoire `θ(t) = φ + ωt + ½αt²`, on **intègre le signal brut le long** de
+cette trajectoire, et on seuille l'intégrale. Un objet réel s'additionne de
+façon cohérente sur N images (signal ∝ N, bruit ∝ √N), le reste s'annule.
+C'est une transformée de Radon de la carte espace-temps. S'y ajoute
+`null_rotor`, qui bascule la carte dans le référentiel tournant du rotor pour
+en retirer exactement la texture (poches, numéros, bras) — sinon le rotor,
+bien plus brillant que la bille, domine la transformée.
+
+**Seuil de détection mesuré** sur rendu synthétique oblique, bruité et assombri
+(régime où la détection par blob échoue) :
+
+| Gain / bruit | Détection | Ratio pic/plancher | ω trouvée |
+|---|---|---|---|
+| 0,60 / 5 | oui | 3,20 | correcte |
+| 0,30 / 9 | oui | 3,13 | correcte |
+| 0,20 / 12 | oui | 2,77 | correcte |
+| 0,12 / 16 | **non** | 1,34 | fausse |
+| 0,08 / 20 | **non** | 1,33 | fausse |
+
+**Mesure sur la vidéo réelle** : vue plongeante (bille certaine) → ratio
+**3,06**, régime de détection franche. Fenêtre de paris 62–76 s en vue latérale
+→ ratio **1,44**, avec les meilleurs pics éparpillés entre −825 et +2000 °/s :
+c'est la signature du **régime de cécité**, pas celle d'une absence.
+
+**Conclusion honnête** : sur ce flux, en vue latérale, l'instrumentation
+actuelle est sous le seuil. La vidéo est compatible avec une bille présente
+avant la fermeture des paris. Affirmer l'inverse serait confondre « je ne vois
+pas » et « il n'y a rien » — l'erreur commise trois fois dans ce projet.
+
 ## Contexte : la fenêtre de paris sur ce flux
 
 La vidéo analysée (3 min 57, 954×720) est un **enregistrement d'écran d'une
