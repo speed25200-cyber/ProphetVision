@@ -123,7 +123,32 @@ extrapolé à 81,4 s, donne **−129 °/s**. La vue plongeante, après la coupur
 par une mesure totalement indépendante, donne **−130 °/s à 82,07 s**. Un accord
 à 1 % à travers un changement de caméra.
 
-### Ce qui manque encore pour nommer la poche depuis le latéral
+### Zone produite depuis la vue latérale seule
+
+Images utilisées : **71,70 → 80,05 s**, soit entièrement avant la coupure
+caméra (81,47 s). 86 détections, modèle physique ajusté (résidu 4,6°).
+
+Contrôle croisé : vitesse prédite à 81,4 s = **−135 °/s**, mesure indépendante
+en vue plongeante = **−130 °/s**.
+
+Budget d'erreur par Monte-Carlo (ancre rotor ±1,3 poche, instant de contact
+±0,5 s, résidu de trajectoire) → **incertitude 1σ = 3,6 poches**.
+
+| Largeur de zone | Couverture estimée | Contient le résultat réel (25) |
+|---|---|---|
+| 9 poches | 74 % | non |
+| **13 poches** | **91 %** | **oui** |
+| 17 poches | 98 % | oui |
+
+Zone 13 poches : `[25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5]`
+
+Autrement dit : à 3,6 poches de σ, une zone de 9 poches est **trop étroite** —
+elle rate le résultat sur ce spin. Il faut 13 poches pour atteindre ~90 % de
+couverture. C'est la précision réelle en vue latérale aujourd'hui, mesurée et
+non postulée, sur **un seul spin** — ce qui n'est pas une validation
+statistique.
+
+### Ce qui limite la précision depuis le latéral
 
 La trajectoire de la bille est acquise ; le maillon faible est la **phase
 absolue du rotor en vue latérale**. Trois mesures indépendantes se
