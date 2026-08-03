@@ -95,6 +95,44 @@ Sur un second spin (C), l'ajustement n'a disposé que de 159° d'arc à cause
 d'une coupure de détection, et l'erreur est montée à 6,4 poches — exactement
 le cas que les seuils de `feasibility.py` sont là pour signaler.
 
+## Vue latérale : la bille est suivie AVANT la coupure caméra (`sidetrack.py`)
+
+C'est ce qui bloquait tout le projet — et le précédent, dont le SPEC porte
+« tracking oblique ABANDONNÉ ». Trois pièces l'ont débloqué.
+
+**1. Calibrer l'ellipse par la rigidité du rotor.** Une ellipse devinée sur le
+contour visible est assez fausse pour que la vitesse angulaire retrouvée varie
+avec le rayon — 147 et 127 °/s mesurés à deux rayons du *même rotor rigide*.
+Un corps rigide n'a qu'une vitesse : cet écart est donc un signal d'erreur
+objectif. En l'optimisant, l'écart tombe de ~20 à **5,3 °/s**.
+
+**2. Voter sur des trajectoires entières, jamais chaîner les détections.** Le
+chaînage glouton se verrouille sur le premier reflet fixe : il a produit une
+« piste » figée à 139° pendant huit secondes. La transformée de Hough sur la
+famille `θ(t) = φ + ωt + ½αt²` y est insensible, et supporte les trous causés
+par la bille qui disparaît derrière le rebord proche à chaque tour.
+
+**3. Rejeter le fouillis statique d'abord** (735 → 167 détections).
+
+**Résultat sur la vidéo de référence** : la bille est suivie de **71,7 s à
+80,05 s en vue latérale — avant la coupure caméra mesurée à 81,467 s** — avec
+ω₀ = −520 °/s et α = +40 °/s².
+
+**La vérification qui prouve que c'est bien la bille** : cet ajustement,
+extrapolé à 81,4 s, donne **−129 °/s**. La vue plongeante, après la coupure et
+par une mesure totalement indépendante, donne **−130 °/s à 82,07 s**. Un accord
+à 1 % à travers un changement de caméra.
+
+### Ce qui manque encore pour nommer la poche depuis le latéral
+
+La trajectoire de la bille est acquise ; le maillon faible est la **phase
+absolue du rotor en vue latérale**. Trois mesures indépendantes se
+contredisent (corrélation d'anneau 30,6 °/s, rigidité 89 °/s, plongée
+66,6 °/s), et le zéro vert n'est détectable que sur 27 images sur 624, avec une
+dispersion de 64,6° (6,6 poches). Une zone de 9 poches demande environ ±4
+poches : on n'y est pas. **La zone latérale produite n'est donc pas fiable, et
+le dépôt ne prétend pas le contraire.**
+
 ## Vue latérale : le détecteur était aveugle — correction méthodologique
 
 Une conclusion négative n'a de valeur que si le détecteur est capable de voir
