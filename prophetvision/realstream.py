@@ -58,6 +58,56 @@ def unwrap_directional(az_deg: np.ndarray, direction: int = -1,
     return np.array(out)
 
 
+def unwrap_predictive(t, az_deg, direction: int = -1,
+                      seed_span: float = 0.4) -> np.ndarray:
+    """Unwrap azimuths across gaps using the running angular velocity.
+
+    A fixed-slack unwrap (:func:`unwrap_directional`) assumes every gap is
+    shorter than one revolution. That is false here: a detector dropout of a
+    few tenths of a second while the ball turns at several hundred deg/s hides
+    one or more whole turns, and the track silently loses them — the failure
+    that made fitted arcs jump from 84 to 253 degrees when a few samples were
+    added.
+
+    This version keeps a velocity estimate from the recent accepted samples and
+    across each step picks the number of wraps closest to the predicted travel
+    ``omega * dt``, so whole revolutions inside a gap are recovered.
+    """
+    t = np.asarray(t, dtype=float)
+    az = np.asarray(az_deg, dtype=float)
+    if len(t) < 2:
+        return az.copy()
+    out = [az[0]]
+    omega = None
+    for i in range(1, len(t)):
+        dt = t[i] - t[i - 1]
+        if dt <= 0:
+            out.append(out[-1])
+            continue
+        if omega is None:
+            # Seed with the direction-constrained step until enough span.
+            step = (az[i] - out[-1]) % 360.0
+            if direction < 0:
+                step -= 360.0 if step > 30.0 else 0.0
+            elif step > 330.0:
+                step -= 360.0
+        else:
+            predicted = out[-1] + omega * dt
+            # nearest congruent value to the prediction
+            step = (az[i] - predicted) % 360.0
+            if step > 180.0:
+                step -= 360.0
+            step += predicted - out[-1]
+        out.append(out[-1] + step)
+        span = t[i] - t[0]
+        if span >= seed_span:
+            j = np.searchsorted(t, t[i] - seed_span)
+            j = max(0, min(j, i - 1))
+            if t[i] > t[j]:
+                omega = (out[i] - out[j]) / (t[i] - t[j])
+    return np.array(out)
+
+
 @dataclass
 class BallSample:
     t: float

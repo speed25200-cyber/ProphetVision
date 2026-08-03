@@ -138,6 +138,52 @@ actuelle est sous le seuil. La vidéo est compatible avec une bille présente
 avant la fermeture des paris. Affirmer l'inverse serait confondre « je ne vois
 pas » et « il n'y a rien » — l'erreur commise trois fois dans ce projet.
 
+## Pipeline complet : vidéo → zone d'atterrissage (`endtoend.py`)
+
+Le détecteur appris a débloqué la chaîne complète. Un seul détail décide de
+tout : **la porte radiale doit s'appliquer AVANT la suppression non-maximale**.
+Le moyeu doré est rond, brillant et couleur bille ; sans cette précaution il
+rafle les détections et écrase celles de la bille (417 détections sur le moyeu
+contre 3 sur l'anneau). Avec la porte en premier : **une détection propre par
+image, confiance médiane 0,83, azimut parfaitement monotone**.
+
+```
+YOLO (porte radiale avant NMS)
+  → dé-roulement prédictif (récupère les tours entiers cachés dans un trou)
+  → ajustement du modèle de décroissance jusqu'à la coupure
+  → extrapolation vers le contact rotor
+  → phase du rotor (zéro vert) → poche d'impact
+  → dispersion apprise → P(poche finale)
+```
+
+**Précision mesurée sur le spin A de la vidéo réelle** (erreur de l'azimut
+extrapolé contre l'azimut réellement observé, ~1 s plus tard) :
+
+| Arc suivi | Échantillons | Avance | Erreur | En poches |
+|---|---|---|---|---|
+| 84° | 36 | 1,00 s | 33,8° | 3,48 |
+| 84° | 36 | 1,00 s | 48,6° | 5,00 |
+| **253°** | 52 | 1,00 s | 5,4° | **0,55** |
+| **289°** | 76 | 0,75 s | 1,8° | **0,18** |
+| **308°** | 88 | 0,55 s | 1,1° | **0,12** |
+
+La rupture est nette et reproductible : **en dessous de ~250° d'arc suivi, les
+deux coefficients de décroissance ne sont pas séparables** et l'erreur passe de
+0,2 à 3-5 poches. `predict_spin()` refuse donc explicitement de répondre sous
+ce seuil plutôt que de rendre un chiffre que les données ne soutiennent pas :
+
+```
+cutoff 84.0 -> REFUS: tracked arc 201 deg is below the 250 deg needed
+cutoff 84.4 | lead 1.6s | det 55 | arc 253 | resid 1.17 | rotor +67
+cutoff 84.8 | lead 1.2s | det 79 | arc 289 | resid 1.08 | rotor +67
+```
+
+Le dé-roulement prédictif (`unwrap_predictive`) corrige un défaut réel : un
+trou de détection de 1,3 s pendant que la bille tourne vite masque un ou
+plusieurs tours entiers, qu'un dé-roulement à marge fixe perd silencieusement —
+c'est ce qui faisait sauter l'arc ajusté de 84° à 253° en ajoutant quelques
+échantillons.
+
 ## Détecteur appris (YOLO ONNX) — état mesuré
 
 Le modèle `ball_sota_yolo11n_320_fp16.onnx` fourni avec le dépôt est enveloppé
