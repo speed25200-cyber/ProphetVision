@@ -30,8 +30,12 @@ jobs:
             -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an hq_060_100.mp4
           ffmpeg -y -ss 100 -to 135 -i original.mov -c:v libx264 \
             -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an hq_100_135.mp4
-          ffmpeg -y -ss 210 -to 237.5 -i original.mov -c:v libx264 \
-            -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an hq_210_237.mp4
+          ffmpeg -y -ss 25 -to 56 -i original.mov -c:v libx264 \
+            -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an hq_025_056.mp4
+          ffmpeg -y -ss 145 -to 192 -i original.mov -c:v libx264 \
+            -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an hq_145_192.mp4
+          ffmpeg -y -ss 192 -to 237.4 -i original.mov -c:v libx264 \
+            -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an hq_192_237.mp4
           ls -la hq_*.mp4
       - name: Split and push chunks branch
         run: |
