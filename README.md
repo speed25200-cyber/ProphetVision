@@ -173,8 +173,35 @@ avec des vides de 0,5 s. Deux corrections :
 
 Zone 18 jetons : `[0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23]`
 
-⚠️ **Ces chiffres décrivent le point d'IMPACT sur le rotor, pas la poche
-finale.** Le rebond qui suit est chaotique et n'est ni modélisé ni mesuré ici
+### Le rebond : mesuré partiellement, et il est GRAND
+
+Tentative de mesure directe sur le spin A, en suivant la bille en continu depuis
+le rebord jusqu'au repos. Astuce qui évite le problème d'ancrage : impact et
+poche finale sont mesurés **dans le même repère rotor**, donc toute erreur
+d'ancre s'annule dans leur différence.
+
+Le suivi est propre et à forte confiance (0,68-0,88) pendant toute la descente :
+
+| t (s) | rayon | indice relatif |
+|---|---|---|
+| 85,13 | 0,89 | 36,0 |
+| 85,58 | 0,78 | 29,1 |
+| 86,07 | 0,57 | 24,5 |
+| 86,68 | 0,77 | 10,5 |
+| 86,85 | 0,65 | 8,8 |
+
+**La bille parcourt ~27 poches par rapport au rotor entre la sortie du rebord et
+la fin de la descente traçable.** Au-delà de 87 s les confiances tombent
+(0,47-0,70) et le point d'immobilisation n'est pas résolu.
+
+⚠️ **Conséquence directe : le taux de réussite réel sur 18 jetons n'est PAS
+établi.** Un rebond qui déplace la bille de plusieurs dizaines de poches par
+rapport au rotor domine complètement les 4,4 poches de précision sur le point
+d'impact. Tant que sa dispersion n'est pas mesurée sur plusieurs spins, annoncer
+60-70 % serait une invention.
+
+⚠️ **Les chiffres ci-dessus décrivent le point d'IMPACT sur le rotor, pas la
+poche finale.** Le rebond qui suit est chaotique et n'est ni modélisé ni mesuré ici
 sur des spins réels ; il ajoute typiquement plusieurs poches de dispersion.
 Avec un rebond à σ ≈ 4 poches, le total monterait à ≈ 6 poches et 18 jetons
 donneraient ≈ 87 %. Ce terme reste **à mesurer**, et il est le dernier écart
