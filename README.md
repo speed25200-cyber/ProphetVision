@@ -173,7 +173,48 @@ avec des vides de 0,5 s. Deux corrections :
 
 Zone 18 jetons : `[0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23]`
 
-### Taux de réussite sur 18 jetons : 59-82 %, estimation centrale ~72 %
+## Résultat final, mesuré sur 5 spins : le rebond annule l'avantage
+
+Les cinq tours de la vidéo ont été mesurés. Résultats officiels lus à l'écran et
+**chacun vérifié par ses deux voisins de roue** (le jeu affiche le gagnant
+encadré de ses voisins réels — contrôle d'auto-cohérence fort), puis recoupés
+avec le bandeau d'historique.
+
+Le rebond est mesuré **sans ancrage** : l'ancre est une constante de la
+roue+caméra, donc elle disparaît dans la dispersion des
+`v_i = index(résultat_i) − index_impact_i`.
+
+| spin | index impact | résultat | index roue | v_i |
+|---|---|---|---|---|
+| A | 29,13 | 25 | 7 | 14,87 |
+| B | 2,14 | 9 | 27 | 24,86 |
+| 1 | 12,91 | 27 | 11 | 35,09 |
+| 4 | 2,21 | 1 | 23 | 20,79 |
+| 5 | 24,14 | 31 | 26 | 1,86 |
+
+**R = 0,152 → σ_rebond = 11,4 poches.** Combiné à σ_impact = 4,4 :
+**σ_total = 12,25 poches**.
+
+| Mise | Couverture | Base uniforme (W/37) | Rentabilité (W/36) |
+|---|---|---|---|
+| 13 | 40,4 % | 35,1 % | 36,1 % |
+| **18** | **53,7 %** | **48,6 %** | **50,0 %** |
+| 21 | 60,9 % | 56,8 % | 58,3 % |
+
+**Sur 18 jetons : 53,7 %, contre 48,6 % en misant au hasard.** L'objectif de
+60-70 % n'est pas atteint.
+
+**Et le point décisif : cet écart n'est pas statistiquement significatif.** Test
+de Rayleigh sur les cinq `v_i` : Z = 0,115, **p = 0,89**. Les rebonds observés
+sont indiscernables d'une dispersion uniforme — les données ne permettent pas de
+distinguer « σ_rebond = 11 poches » de « le rebond détruit toute information ».
+Fourchette défendable pour 18 jetons : **48,6 % (plancher uniforme) à 72,4 %**.
+
+La prédiction du **point d'impact** fonctionne et reste validée (σ = 4,4 poches,
+erreur réelle 1,8 poche sur le spin A). C'est le rebond, mesuré ici pour la
+première fois sur des spins réels, qui absorbe cet avantage.
+
+### Historique : estimation intermédiaire sur 2 spins (dépassée)
 
 Le rebond a été mesuré par une méthode **sans ancrage**. L'ancre (décalage entre
 le repère vision et la numérotation de la roue) est une constante de la
