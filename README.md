@@ -173,7 +173,39 @@ avec des vides de 0,5 s. Deux corrections :
 
 Zone 18 jetons : `[0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23]`
 
-### Le rebond : mesuré partiellement, et il est GRAND
+### Taux de réussite sur 18 jetons : 59-82 %, estimation centrale ~72 %
+
+Le rebond a été mesuré par une méthode **sans ancrage**. L'ancre (décalage entre
+le repère vision et la numérotation de la roue) est une constante de la
+roue+caméra, donc elle s'élimine dans la *différence* entre deux spins :
+
+```
+rebond_i + ancre = index(résultat_i) − index_impact_i   (mod 37)
+```
+
+| Spin | index impact mesuré | résultat | rebond + ancre |
+|---|---|---|---|
+| A | 29,13 | 25 (index 7) | 14,87 |
+| B | 2,14 | 9 (index 27) | 24,86 |
+
+**Différence = 10,0 poches.** Le rebond varie donc bien d'un spin à l'autre, et
+cette variation est mesurée, pas supposée.
+
+Combinée à la précision du point d'impact (σ = 4,4 poches) :
+
+| σ rebond supposé | σ total | **18 jetons** |
+|---|---|---|
+| 5,0 | 6,7 | **82 %** |
+| 7,1 | 8,3 | **72 %** |
+| 10,0 | 10,9 | **59 %** |
+
+**Une différence observée de 10 poches est compatible avec un écart-type de
+rebond entre 5 et 10 poches**, donc **18 jetons donnent 59 à 82 %**, estimation
+centrale ~72 %. C'est l'ordre de grandeur demandé — mais avec **n = 2 spins**,
+l'incertitude sur cette fourchette est elle-même très large. Il faut 5-10 spins
+pour resserrer.
+
+### Ce que le suivi du rebond ne permet PAS (piège documenté)
 
 Tentative de mesure directe sur le spin A, en suivant la bille en continu depuis
 le rebord jusqu'au repos. Astuce qui évite le problème d'ancrage : impact et
