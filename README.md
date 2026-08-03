@@ -123,7 +123,47 @@ extrapolé à 81,4 s, donne **−129 °/s**. La vue plongeante, après la coupur
 par une mesure totalement indépendante, donne **−130 °/s à 82,07 s**. Un accord
 à 1 % à travers un changement de caméra.
 
-### Le vrai verrou, chiffré : la précision sur l'instant de chute
+## Prédiction précoce : 2 s avant l'animation des multiplicateurs (`earlyside.py`)
+
+Contrainte opérationnelle : la prédiction doit sortir **2-3 s avant l'animation
+des multiplicateurs**, qui recouvre ensuite la roue. Mesurée précisément, elle
+démarre à **74,00 s** (spin A) et **122,00 s** (spin B). La coupure est donc
+~72 s — et la bille n'atteint la piste extérieure que vers 70,4 s : il reste
+**1,5 à 2 s de données**.
+
+C'est bien trop court pour identifier la loi de décroissance, donc **on ne
+l'ajuste pas**. `c₀` et `c₂` sont des propriétés de la roue, calibrées une fois
+(`WheelDecay.from_two_decelerations`, exacte sur les deux décélérations
+mesurées 38,9 et 19,2 °/s² → c₀ = 17,5, c₂ = 1,99×10⁻⁴). Seules la vitesse et
+la phase restent libres — un paramètre, récupérable sur 19 détections.
+
+**Résultat sur le spin A, coupure 72,0 s :**
+
+| | valeur |
+|---|---|
+| détections utilisées | 19 (70,47 → 71,92 s) |
+| résidu d'ajustement | 6,4° |
+| vitesse ω(72,0) | 495 °/s, **±2,7 %** (bootstrap) |
+| instant de chute prédit | **86,36 s** (observé 86,0) |
+| indice d'arrivée prédit | **7,15** — la vérité est **7** |
+| zone 9 poches | `[19, 4, 21, 2, 25, 17, 34, 6, 27]` — **25 au centre** |
+
+**Mais ce résultat n'est pas reproductible à cette finesse, et il faut le dire :**
+en déplaçant la coupure de 72,0 à 72,5 s, l'indice passe de 7,15 à 0,26, soit
+**6,7 poches de dérive**. La fiabilité honnête est celle que donne la
+propagation d'erreur, pas ce coup au but :
+
+| Zone | Couverture |
+|---|---|
+| 9 poches | 25 % |
+| 13 poches | 37 % |
+| 21 poches | **58 %** |
+
+σ = 13,2 poches. Une zone de 21 poches à ~58 % est ce que la méthode soutient
+réellement aujourd'hui à cette coupure ; la zone de 9 poches qui contient 25
+est en grande partie de la chance sur un spin.
+
+### Le verrou, chiffré : la précision sur l'instant de chute
 
 Près du contact, la bille et le rotor ont des vitesses comparables et opposées.
 L'angle **relatif** bille-rotor — la seule quantité qui détermine la poche —
