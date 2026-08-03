@@ -172,6 +172,22 @@ deux coefficients de décroissance ne sont pas séparables** et l'erreur passe d
 0,2 à 3-5 poches. `predict_spin()` refuse donc explicitement de répondre sous
 ce seuil plutôt que de rendre un chiffre que les données ne soutiennent pas :
 
+**Horizon utile ≈ 1 seconde.** L'autre limite, mesurée sur la chaîne complète
+(azimut prédit → phase rotor → indice de poche) :
+
+| Avance | Erreur sur l'indice de poche |
+|---|---|
+| 0,55 s | **0,12** |
+| 0,75 s | **0,18** |
+| 1,00 s | **0,55** |
+| 1,20 s | 3,20 |
+| 1,60 s | 2,40 |
+
+Au-delà d'environ 1 s l'erreur décroche : sur ce flux la bille est déjà lente
+(≈130 °/s) quand elle devient observable, et la fin de la phase de rebord est
+courte. C'est l'horizon réel de ce logiciel sur cette vidéo, pas une valeur
+théorique.
+
 ```
 cutoff 84.0 -> REFUS: tracked arc 201 deg is below the 250 deg needed
 cutoff 84.4 | lead 1.6s | det 55 | arc 253 | resid 1.17 | rotor +67
