@@ -184,6 +184,34 @@ plusieurs tours entiers, qu'un dé-roulement à marge fixe perd silencieusement 
 c'est ce qui faisait sauter l'arc ajusté de 84° à 253° en ajoutant quelques
 échantillons.
 
+## Nommer la poche : `pocketmap.py`
+
+La physique prédit **où** la bille rejoint le rotor — un azimut relatif au
+repère du rotor, et c'est cette quantité qui est validée à 0,12-0,55 poche.
+Pour en tirer un **numéro** de poche il manque une constante : le décalage
+angulaire entre le repère que la vision accroche et l'origine de la
+numérotation. Cette constante dépend de la roue et de la caméra, pas du spin.
+
+Deux façons de la mesurer automatiquement ont été essayées et ont échoué — les
+deux échecs sont documentés parce qu'ils sont instructifs :
+
+- **la bille au repos** : immobile elle est petite et sombre, et au rayon des
+  poches elle est entourée de séparateurs blancs et de chiffres sur lesquels le
+  détecteur tire tout autant. Filtrer assez durement sur la couleur crème pour
+  les exclure ne laissait plus que 1 à 2 images exploitables sur des centaines ;
+- **le marqueur du résultat** : la carte rouge posée sur le numéro gagnant a
+  l'air d'un repère physique, mais c'est un **élément d'interface**. Mesuré de
+  95 à 98,6 s, son azimut reste à 269,4 ± 0,5° pendant que la roue tourne de
+  120°. Il est fixé à l'écran, pas à la poche.
+
+La solution retenue est donc explicite : **un spin étiqueté suffit**. On lit le
+résultat sur le bandeau d'historique du jeu, on appelle `observe()`, et tous
+les spins suivants sur la même roue et la même caméra sont nommés. `PocketMap`
+refuse de nommer tant qu'il n'est pas calibré, et signale `is_trustworthy =
+False` tant que les décalages de plusieurs spins ne concordent pas à moins
+d'une poche — le garde-fou qui a détecté que mes deux mesures de bille au repos
+divergeaient de 19 poches.
+
 ## Détecteur appris (YOLO ONNX) — état mesuré
 
 Le modèle `ball_sota_yolo11n_320_fp16.onnx` fourni avec le dépôt est enveloppé
