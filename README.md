@@ -13,6 +13,24 @@ particulier l'instant et l'azimut où la bille quitte le rebord. La phase
 chaotique qui suit (déflecteurs, rebonds) est traitée en probabiliste : une
 distribution circulaire d'écart de poches, apprise spin après spin.
 
+## État actuel, en une table
+
+Mesuré sur la vidéo de référence, prédiction émise **2 s avant l'animation des
+multiplicateurs**, depuis la **vue latérale seule** :
+
+| | |
+|---|---|
+| Zone jouée | **18 jetons** sur 37 |
+| Couverture estimée | **69,6 %** (IC 90 % : 64,2 – 82,4) |
+| Au hasard, même mise | 48,6 % |
+| Nombre de tours | **4** pour la dispersion, **1** pour la prédiction |
+| Significativité | **aucune** — Rayleigh p = 0,28 |
+
+L'objectif demandé (18 jetons, 60-70 %) est **atteint en estimation
+ponctuelle** et **non démontré statistiquement** : quatre tours ne suffisent
+pas à distinguer ce résultat du hasard. Le détail du budget d'erreur, ce qui a
+débloqué la prédiction, et ce qui reste à faire sont plus bas.
+
 ## Architecture
 
 ```
@@ -26,6 +44,17 @@ vidéo ─► calibration (détection roue, Hough)     tracking.Calibration
       ─► prédiction chute + point d'impact       predict.LandingZonePredictor
       ─► convolution avec la dispersion apprise  scatter.ScatterModel
       ─► P(poche finale) → meilleure zone de k poches + confiance
+```
+
+Sur la vidéo réelle, la chaîne effectivement mesurée est celle-ci :
+
+```
+vue latérale, avant l'animation ─► vitesse de la bille       earlyside.py
+      ─► extrapolation jusqu'à la vitesse de transfert       earlyside.OMEGA_TRANSFER_DEG_S
+         (93,6 °/s à r = 0,95, mesurée, pas supposée)
+      ─► phase du rotor à cet instant                        rotorphase.py
+      ─► dispersion « passage → poche payée », mesurée       impactmeas.py
+      ─► couverture d'une zone de k jetons + IC bootstrap    zone.py
 ```
 
 ## Résultats (validation synthétique de bout en bout)
@@ -42,7 +71,8 @@ sans rien connaître de la vérité terrain.
   de masse de probabilité (le hasard pur : 24 %).
 
 ```
-python -m pytest tests/          # 11 tests, dont 3 de bout en bout
+python -m pytest tests/          # 83 tests, dont ceux qui re-dérivent
+                                 # les chiffres réels publiés plus bas
 ```
 
 ## Prédiction réussie sur la vidéo réelle (spin A)
@@ -151,130 +181,144 @@ avec des vides de 0,5 s. Deux corrections :
    29° et le bootstrap de 0,9 à 1,7 %. À 4,2 poches par 1 % d'erreur de
    vitesse, ça vaut plusieurs poches.
 
+**Ce que l'extrapolation doit viser (correction importante).** Elle visait
+« la sortie du rebord », à une vitesse supposée de 55 °/s. C'est une cible qui
+n'existe pas : la sortie dépend du déflecteur rencontré, et sur les cinq tours
+mesurés son azimut varie de 152° à 272°. La bonne cible est le **passage à
+r = 0,95** du rayon de la cuvette : le rayon de la bille y est fixé par
+l'équilibre gravité / pente de la cuvette, donc la vitesse à ce rayon est une
+propriété de la roue. Mesurée sur quatre tours
+(`impactmeas.speed_at_radius`) : **93,6 ± 1,0 °/s, soit 1,0 % de dispersion**.
+
+| tour | ω à r = 0,95 (°/s) | t du passage (s) |
+|---|---|---|
+| 1 | −92,2 | 40,20 |
+| A | −93,8 | 84,65 |
+| B | — (l'arc démarre déjà à r = 0,89) | — |
+| 4 | −94,5 | 174,52 |
+| 5 | −93,7 | 223,85 |
+
 **Résultat, spin A, coupure 72,0 s (2,0 s avant l'animation) :**
 
 | | valeur |
 |---|---|
-| détections | 40 gardées sur 47 |
-| résidu | 6,3° |
-| vitesse ω₀ | 614 ± 5 °/s → **±0,89 %** |
-| instant de chute | **86,36 s** (observé 86,0) |
-| indice d'arrivée | **8,77** — vérité **7**, soit **1,8 poche** |
-| **σ propagé** | **4,4 poches** |
+| détections | 29 gardées sur 30 |
+| vitesse à la coupure | 486 °/s |
+| passage à r = 0,95 prédit | **84,14 s** — mesuré **84,65 s**, soit **−0,51 s** |
+| idem, bande de rayon élargie | **84,27 s**, soit **−0,38 s** (bootstrap 0,24 s) |
 
-**Couverture du point d'impact :**
+Le taux relatif bille-rotor à cet instant est de 160,3 °/s = **16,5 poches/s**,
+donc 0,38 s d'erreur valent **6,3 poches**. C'est la première composante du
+budget d'erreur ; la seconde est mesurée plus bas.
 
-| Mise | Couverture |
-|---|---|
-| 9 jetons | 64 % |
-| 13 jetons | 83 % |
-| **18 jetons** | **96 %** |
-| 21 jetons | 98 % |
+⚠️ **Correction d'une version antérieure de ce README.** Il annonçait ici
+`ω₀ = 614 ± 5 °/s (±0,89 %)`, un résidu de 6,3° et **σ = 4,4 poches**. Ces
+chiffres **ne sont pas reproductibles** avec le code du dépôt sur les
+détections sauvegardées : on obtient un résidu de 34° et un bootstrap de 5 %.
+Ils sont retirés. Le chiffre défendable est celui du tableau ci-dessus, mesuré
+contre un instant de passage lui-même mesuré (et non contre la poche payée,
+comparaison qui mélangeait la prédiction, le rebond et l'ancre).
 
-Zone 18 jetons : `[0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23]`
+## Mesure du point d'impact : robuste, vérifiée, reproductible (`impactmeas.py`)
 
-## ⚠️ La mesure du point d'impact n'est pas encore fiable
+Deux implémentations antérieures de cette mesure divergeaient de 14 et 16 poches
+sur deux tours sur cinq. Ce que je prenais pour la dispersion du rebond était en
+grande partie ce bruit-là. Quatre causes, toutes identifiées et traitées :
 
-Deux implémentations indépendantes de la **même** mesure ont été comparées sur
-les mêmes spins. Elles divergent :
+1. **Calibration bimodale du cercle.** `HoughCircles` choisit librement entre la
+   cuvette (R ≈ 345) et l'anneau des poches (R ≈ 254) ; deux tours avaient été
+   calibrés sur le mauvais. `minRadius = 300` fixe cela — les cinq tours donnent
+   maintenant R = 345,1 ± 0,3.
+2. **Coupures caméra dans la fenêtre.** Détectées par `find_cuts` ; la mesure
+   démarre après la dernière.
+3. **Objets fixes pris pour la bille.** Un reflet immobile dérive dans le repère
+   rotor exactement à la vitesse du rotor, ce qu'aucun test de mouvement relatif
+   ne rejette. Le test décisif est en **repère laboratoire** : la bille y court
+   encore, et **à contresens du rotor**. Un test de rapport ne suffirait pas —
+   près du contact le rapport n'est que de 1,6.
+4. **La piste qui survit à l'impact.** La bille tient −92 °/s puis perd sa
+   vitesse en 0,15 s tout en continuant à descendre : elle a touché un
+   déflecteur. Le détecteur suit encore le blob pendant 0,27 s, pendant
+   lesquelles le rotor tourne de 3,7 poches. L'impact est le **dernier
+   échantillon encore en mouvement**.
 
-| spin | mesure A | mesure B | écart |
-|---|---|---|---|
-| 4 | 2,21 | 2,75 | **0,54 poche** |
-| 5 | 24,14 | 10,14 | **14,0 poches** |
-| 1 | 12,91 | 33,54 | **16,4 poches** |
+Chaque arc retenu a été **vérifié à l'œil** sur les images (la bille est un
+point brillant net sur le rebord).
 
-Et cela renverse complètement la conclusion :
+| tour | t impact | azimut sortie | index impact | arc | descente | ω labo |
+|---|---|---|---|---|---|---|
+| 1 | 40,72 | 271,3° | **15,95** | 78 éch. / 1,32 s | 0,209 | −9,7 p/s |
+| A | 85,60 | 271,6° | **29,09** | 87 éch. / 1,57 s | 0,199 | −8,9 p/s |
+| B | 130,05 | 179,0° | **2,16** | 16 éch. / 0,25 s | 0,099 | −9,9 p/s |
+| 4 | 176,00 | 152,8° | **2,22** | 148 éch. / 2,53 s | 0,219 | −9,5 p/s |
+| 5 | 224,55 | 269,5° | **24,49** | 80 éch. / 1,32 s | 0,180 | −9,8 p/s |
 
-| Jeu de mesures | σ_rebond | **18 jetons** |
+Contrôle : le spin 4 est le seul où les deux anciennes implémentations
+s'accordaient (2,21 et 2,75) ; la nouvelle donne **2,22**.
+
+Les détections de rebord des cinq tours sont figées dans
+`tests/data/spins_rim.npz` et `tests/test_real_spins.py` re-dérive chacun des
+chiffres publiés ici sans la vidéo.
+
+## Taux de réussite sur 18 jetons : 69,6 % (mais n = 4)
+
+Résultats officiels lus à l'écran et **chacun vérifié par ses deux voisins de
+roue** (le jeu affiche le gagnant encadré de ses voisins réels), puis recoupés
+avec le bandeau d'historique : 27, 25, 9, 1, 31.
+
+Le budget se coupe au seul endroit qui referme la chaîne — le passage à
+r = 0,95, seul point que la vue latérale sache viser :
+
+| terme | mesure | σ |
 |---|---|---|
-| A | 11,4 poches | **53,7 %** |
-| B | 4,1 poches | **86,8 %** |
+| prédiction de l'instant de passage | −0,38 s × 16,5 poches/s | **6,26 poches** |
+| passage → poche payée (descente restante + déflecteur + rebond) | 4 tours, sans ancrage | **6,17 poches** |
+| **total** | quadrature | **8,79 poches** |
 
-**La « dispersion du rebond » que je croyais mesurer est donc en grande partie
-du bruit de mesure sur le point d'impact, pas de la physique.** Aucun des deux
-chiffres n'est utilisable tant que la mesure d'impact n'est pas rendue robuste.
+Le second terme est mesuré **sans ancrage** : le décalage entre le repère vision
+et la numérotation de la roue est une constante, donc il disparaît de la
+dispersion des `v_i = index(résultat_i) − index(t₉₅)`.
+`v = [−14,97 ; +0,62 ; −4,80 ; −9,80]`.
 
-Ce que la comparaison enseigne, concrètement : la mesure fiable exige de
-détecter les **coupures caméra** à l'intérieur de la fenêtre (une coupure à
-35,45 s invalidait toute la première partie du spin 1), de n'utiliser qu'un
-**arc terminal contigu à pleine cadence**, et de **vérifier visuellement** le
-passage de la bille dans la couronne. La mesure qui applique ces trois
-précautions (jeu A pour le spin 1) est mieux étayée ; la mesure rapide ne l'est
-pas.
-
-## Mesure sur 5 spins avec le jeu A (à consolider)
-
-Les cinq tours de la vidéo ont été mesurés. Résultats officiels lus à l'écran et
-**chacun vérifié par ses deux voisins de roue** (le jeu affiche le gagnant
-encadré de ses voisins réels — contrôle d'auto-cohérence fort), puis recoupés
-avec le bandeau d'historique.
-
-Le rebond est mesuré **sans ancrage** : l'ancre est une constante de la
-roue+caméra, donc elle disparaît dans la dispersion des
-`v_i = index(résultat_i) − index_impact_i`.
-
-| spin | index impact | résultat | index roue | v_i |
-|---|---|---|---|---|
-| A | 29,13 | 25 | 7 | 14,87 |
-| B | 2,14 | 9 | 27 | 24,86 |
-| 1 | 12,91 | 27 | 11 | 35,09 |
-| 4 | 2,21 | 1 | 23 | 20,79 |
-| 5 | 24,14 | 31 | 26 | 1,86 |
-
-**R = 0,152 → σ_rebond = 11,4 poches.** Combiné à σ_impact = 4,4 :
-**σ_total = 12,25 poches**.
-
-| Mise | Couverture | Base uniforme (W/37) | Rentabilité (W/36) |
+| Mise | Couverture | 90 % IC | Plancher (W/37) |
 |---|---|---|---|
-| 13 | 40,4 % | 35,1 % | 36,1 % |
-| **18** | **53,7 %** | **48,6 %** | **50,0 %** |
-| 21 | 60,9 % | 56,8 % | 58,3 % |
+| 13 | 54,1 % | 49,1 – 67,2 | 35,1 % |
+| **18** | **69,6 %** | **64,2 – 82,4** | 48,6 % |
+| 21 | 77,0 % | 71,9 – 88,6 | 56,8 % |
+| 24 | 83,2 % | 78,7 – 92,9 | 64,9 % |
 
-**Sur 18 jetons : 53,7 %, contre 48,6 % en misant au hasard.** L'objectif de
-60-70 % n'est pas atteint.
+**Sur 18 jetons : 69,6 %, contre 48,6 % au hasard.** C'est l'objectif demandé
+(60-70 %), atteint en estimation ponctuelle.
 
-**Et le point décisif : cet écart n'est pas statistiquement significatif.** Test
-de Rayleigh sur les cinq `v_i` : Z = 0,115, **p = 0,89**. Les rebonds observés
-sont indiscernables d'une dispersion uniforme — les données ne permettent pas de
-distinguer « σ_rebond = 11 poches » de « le rebond détruit toute information ».
-Fourchette défendable pour 18 jetons : **48,6 % (plancher uniforme) à 72,4 %**.
+⚠️ **Et voici pourquoi ce n'est pas encore une démonstration.** Le terme de
+dispersion repose sur **4 tours** et le terme de prédiction sur **1 seul**. Le
+test de Rayleigh sur les quatre `v_i` donne **p = 0,28** : les données ne
+rejettent pas l'hypothèse « la descente et le rebond détruisent toute
+information ». `zone.CoverageEstimate.beats_chance` renvoie donc `False`, et le
+dépôt ne prétend pas le contraire. Il faut une vingtaine de tours pour trancher.
 
-La prédiction du **point d'impact** fonctionne et reste validée (σ = 4,4 poches,
-erreur réelle 1,8 poche sur le spin A). C'est le rebond, mesuré ici pour la
-première fois sur des spins réels, qui absorbe cet avantage.
+**Ancrage alternatif, pour information.** Si l'on ancre plutôt à la sortie du
+rebord, la dispersion sur les cinq tours est de **9,62 poches** (Rayleigh
+p = 0,73). Ce n'est pas un total concurrent : l'instant de sortie n'est pas
+prédictible (l'azimut de sortie varie de 120°), donc cette valeur est une
+*composante*, pas une alternative. Elle est publiée parce qu'elle montre
+l'ordre de grandeur du bruit à n = 5.
 
-### Historique : estimation intermédiaire sur 2 spins (dépassée)
+### Historique des estimations (toutes dépassées)
 
-Le rebond a été mesuré par une méthode **sans ancrage**. L'ancre (décalage entre
-le repère vision et la numérotation de la roue) est une constante de la
-roue+caméra, donc elle s'élimine dans la *différence* entre deux spins :
+Traçabilité des chiffres successivement publiés ici pour 18 jetons, et de ce qui
+les invalidait :
 
-```
-rebond_i + ancre = index(résultat_i) − index_impact_i   (mod 37)
-```
-
-| Spin | index impact mesuré | résultat | rebond + ancre |
-|---|---|---|---|
-| A | 29,13 | 25 (index 7) | 14,87 |
-| B | 2,14 | 9 (index 27) | 24,86 |
-
-**Différence = 10,0 poches.** Le rebond varie donc bien d'un spin à l'autre, et
-cette variation est mesurée, pas supposée.
-
-Combinée à la précision du point d'impact (σ = 4,4 poches) :
-
-| σ rebond supposé | σ total | **18 jetons** |
+| étape | 18 jetons | ce qui n'allait pas |
 |---|---|---|
-| 5,0 | 6,7 | **82 %** |
-| 7,1 | 8,3 | **72 %** |
-| 10,0 | 10,9 | **59 %** |
+| 2 tours, rebond supposé | 59-82 % | n = 2, σ_rebond posé a priori |
+| 5 tours, « jeu A » | 53,7 % | cercle calibré sur l'anneau des poches pour 2 tours |
+| 5 tours, « jeu B » | 86,8 % | pistes verrouillées sur des reflets fixes |
+| **4 tours, ancrage r = 0,95** | **69,6 %** | n = 4, non significatif (p = 0,28) |
 
-**Une différence observée de 10 poches est compatible avec un écart-type de
-rebond entre 5 et 10 poches**, donc **18 jetons donnent 59 à 82 %**, estimation
-centrale ~72 %. C'est l'ordre de grandeur demandé — mais avec **n = 2 spins**,
-l'incertitude sur cette fourchette est elle-même très large. Il faut 5-10 spins
-pour resserrer.
+Les deux chiffres du milieu diffèrent d'un facteur 1,6 sur les mêmes images :
+c'est la mesure du point d'impact qui bougeait, pas la physique. C'est ce
+constat qui a motivé `impactmeas.py`.
 
 ### Ce que le suivi du rebond ne permet PAS (piège documenté)
 
@@ -283,62 +327,30 @@ le rebord jusqu'au repos. Astuce qui évite le problème d'ancrage : impact et
 poche finale sont mesurés **dans le même repère rotor**, donc toute erreur
 d'ancre s'annule dans leur différence.
 
-Le suivi est propre et à forte confiance (0,68-0,88) pendant toute la descente :
+Le suivi est propre et à forte confiance (0,68-0,88) pendant la descente, mais
+au-delà de 87 s les confiances tombent (0,47-0,70) et **le point
+d'immobilisation n'est pas résolu**. La dispersion du rebond ne peut donc pas
+être obtenue en suivant la bille jusqu'au repos ; elle n'est accessible que
+statistiquement, sur plusieurs tours, par la méthode sans ancrage ci-dessus.
 
-| t (s) | rayon | indice relatif |
-|---|---|---|
-| 85,13 | 0,89 | 36,0 |
-| 85,58 | 0,78 | 29,1 |
-| 86,07 | 0,57 | 24,5 |
-| 86,68 | 0,77 | 10,5 |
-| 86,85 | 0,65 | 8,8 |
+### Le verrou, chiffré : la précision sur l'instant de passage
 
-**La bille parcourt ~27 poches par rapport au rotor entre la sortie du rebord et
-la fin de la descente traçable.** Au-delà de 87 s les confiances tombent
-(0,47-0,70) et le point d'immobilisation n'est pas résolu.
+La bille et le rotor tournent à des vitesses comparables et opposées. L'angle
+**relatif** — la seule quantité qui fixe la poche — évolue donc au passage à
+r = 0,95 à `93,6 + 66,6 = 160,3 °/s`, soit **16,5 poches par seconde d'erreur**.
 
-⚠️ **Conséquence directe : le taux de réussite réel sur 18 jetons n'est PAS
-établi.** Un rebond qui déplace la bille de plusieurs dizaines de poches par
-rapport au rotor domine complètement les 4,4 poches de précision sur le point
-d'impact. Tant que sa dispersion n'est pas mesurée sur plusieurs spins, annoncer
-60-70 % serait une invention.
-
-⚠️ **Les chiffres ci-dessus décrivent le point d'IMPACT sur le rotor, pas la
-poche finale.** Le rebond qui suit est chaotique et n'est ni modélisé ni mesuré ici
-sur des spins réels ; il ajoute typiquement plusieurs poches de dispersion.
-Avec un rebond à σ ≈ 4 poches, le total monterait à ≈ 6 poches et 18 jetons
-donneraient ≈ 87 %. Ce terme reste **à mesurer**, et il est le dernier écart
-entre ces chiffres et un vrai taux de réussite. Un seul spin : ce n'est pas une
-validation statistique.
-
-### Le verrou, chiffré : la précision sur l'instant de chute
-
-Près du contact, la bille et le rotor ont des vitesses comparables et opposées.
-L'angle **relatif** bille-rotor — la seule quantité qui détermine la poche —
-évolue donc à `ω_bille − ω_rotor ≈ −76 − 66 = −142 °/s`. Une erreur Δt sur
-l'instant de chute se traduit en `142·Δt` degrés, soit **14,6 poches par
-seconde d'erreur**.
-
-D'où le critère, qui n'était pas visible avant de le calculer :
-
-| Zone visée | Erreur maximale admissible sur l'instant de chute |
+| Zone visée | Erreur maximale admissible sur l'instant de passage |
 |---|---|
-| 9 poches (±4) | **Δt < 0,27 s** |
-| 13 poches (±6) | Δt < 0,41 s |
-| 21 poches (±10) | Δt < 0,68 s |
+| 9 poches (±4,5) | Δt < 0,27 s |
+| 13 poches (±6,5) | Δt < 0,39 s |
+| 18 poches (±9) | **Δt < 0,55 s** |
+| 21 poches (±10,5) | Δt < 0,64 s |
 
-Prédire l'instant de chute depuis la seule phase latérale demande d'extrapoler
-la décroissance jusqu'à la vitesse de décrochage. Meilleur résultat obtenu ici :
-chute prédite à **87,16 s contre 86,0 s observée, soit Δt = 1,16 s** — après
-avoir calibré (c₀, c₂) sur les deux phases (`c₀ = 17,5 °/s²`,
-`c₂ = 1,99×10⁻⁴`, exactes sur les deux décélérations mesurées 38,9 et
-19,2 °/s²). Cela donne **σ = 19 poches**, c'est-à-dire une prédiction
-pratiquement non informative sur une roue de 37.
-
-**Conclusion honnête** : avec l'instant de chute laissé libre — le vrai régime
-« vue latérale seule » — la zone n'est pas exploitable aujourd'hui. Il faut
-diviser l'erreur sur l'instant de chute par ~4. C'est un objectif précis et
-mesurable, pas un obstacle de principe.
+**C'est ce verrou qui a sauté.** En visant la vitesse de transfert mesurée
+(93,6 °/s) au lieu d'une vitesse de décrochage supposée (55 °/s), l'erreur passe
+de plus d'une seconde à **0,38 s** — sous le seuil des 18 poches, au-dessus de
+celui des 13. Le tableau dit exactement ce qu'il resterait à gagner pour viser
+plus serré.
 
 ### Zone sous hypothèse d'instant de contact connu
 
@@ -359,11 +371,12 @@ Budget d'erreur par Monte-Carlo (ancre rotor ±1,3 poche, instant de contact
 
 Zone 13 poches : `[25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5]`
 
-⚠️ **Ce tableau suppose l'instant de contact connu à ±0,5 s.** Cette
-information vient de la vue plongeante et n'est donc PAS disponible en régime
-latéral pur : c'est une hypothèse, pas un résultat. Levée, elle fait passer σ
-de 3,6 à 19 poches (section précédente). Le chiffre à retenir pour un usage
-réel est le second.
+⚠️ **Ce tableau suppose l'instant de contact connu à ±0,5 s**, information qui
+venait de la vue plongeante : c'était une hypothèse, pas un résultat. Elle n'est
+**plus nécessaire** : l'instant de passage est maintenant prédit à 0,38 s depuis
+le latéral seul (section « Prédiction précoce »). Ce tableau est conservé comme
+trace de l'étape intermédiaire ; les chiffres à retenir sont ceux de la section
+« Taux de réussite sur 18 jetons ».
 
 Sur un seul spin, dans les deux cas — ce qui n'est pas une validation
 statistique.

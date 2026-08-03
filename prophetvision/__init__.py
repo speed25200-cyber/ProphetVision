@@ -10,6 +10,8 @@ from .config import WheelConfig, EUROPEAN_ORDER, AMERICAN_ORDER
 from .physics import BallDecayModel, RotorModel
 from .scatter import ScatterModel
 from .predict import LandingZonePredictor, Prediction
+from .impactmeas import ImpactResult, bounce_spread, measure_impact
+from .zone import coverage_ci, wrapped_normal_coverage
 
 __all__ = [
     "WheelConfig",
@@ -20,4 +22,9 @@ __all__ = [
     "ScatterModel",
     "LandingZonePredictor",
     "Prediction",
+    "ImpactResult",
+    "measure_impact",
+    "bounce_spread",
+    "wrapped_normal_coverage",
+    "coverage_ci",
 ]

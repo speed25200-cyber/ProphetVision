@@ -61,6 +61,36 @@ Conséquences pour le pipeline :
 - La vue plongeante ne peut servir qu'à la vérification a posteriori du
   résultat, jamais à la prédiction.
 
+## RÉSULTAT ÉTABLI (2026-08-03) — 18 jetons, 69,6 % en estimation ponctuelle
+
+Chaîne mesurée de bout en bout, prédiction depuis le latéral seul :
+
+- **Ce qui a débloqué la prédiction** : ne plus extrapoler jusqu'à « la sortie
+  du rebord » (vitesse supposée 55 °/s — cible inexistante, l'azimut de sortie
+  varie de 152° à 272° sur les cinq tours) mais jusqu'à la **vitesse de
+  transfert mesurée** : `earlyside.OMEGA_TRANSFER_DEG_S = 93,6 °/s` au passage
+  à r = 0,95 du rayon de cuvette, dispersion **1,0 %** sur quatre tours. La
+  bille y est à un rayon fixé par la géométrie de la cuvette, donc la vitesse
+  y est une propriété de la roue. Erreur sur l'instant de passage :
+  **0,38 s** (contre > 1 s avant), soit 6,3 poches à 16,5 poches/s.
+- **Dispersion passage → poche payée** : 6,17 poches (4 tours, sans ancrage).
+- **σ total = 8,79 poches → 18 jetons = 69,6 %** (IC 90 % 64,2-82,4 ;
+  plancher hasard 48,6 %).
+- **Non significatif** : Rayleigh p = 0,28 sur quatre tours. Ne jamais
+  présenter ce 69,6 % comme démontré ; il faut ~20 tours.
+
+Mesure d'impact rendue reproductible (`impactmeas.py`) après une divergence de
+14-16 poches entre deux implémentations. Quatre pièges, tous traités et
+testés : calibration Hough bimodale (cuvette R≈345 vs anneau des poches R≈254 —
+imposer `minRadius=300`), coupures caméra dans la fenêtre, reflets fixes (le
+test décisif est en **repère laboratoire** : la bille court encore et à
+contresens du rotor ; un test de rapport ne suffit pas, il n'est que de 1,6),
+et la piste qui survit à l'impact (0,27 s de blob immobile = 3,7 poches de
+biais). Les cinq arcs ont été **vérifiés à l'œil** sur les images.
+
+Détections figées dans `tests/data/spins_rim.npz` ; `tests/test_real_spins.py`
+re-dérive tous les chiffres publiés sans la vidéo.
+
 ## Faits établis sur la vidéo de référence (release Video-v1)
 
 - Flux Lightning Roulette, 1206×910 natif, ~24-49 fps utiles (images

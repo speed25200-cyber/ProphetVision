@@ -15,16 +15,23 @@ parameter is recoverable from ~19 detections spanning 1.5 s.
 The error budget is dominated by one term, and it is worth stating because it
 is not obvious. Near contact the ball and rotor turn at comparable, opposite
 rates, so the *relative* angle — the only thing that fixes the pocket — moves at
-about 142 deg/s. Every 0.1 s of error on the predicted drop instant therefore
-costs about 1.5 pockets, and the drop instant is exquisitely sensitive to the
-speed estimate: measured on the reference spin, 1% of speed error moves the drop
-by 0.08 s and the landing by 4.2 pockets.
+about 160 deg/s, or 16.5 pockets per second. Every 0.1 s of error on the
+predicted instant therefore costs about 1.6 pockets.
 
-Measured on spin A with a 72.0 s cutoff: speed known to 2.5% (bootstrap), drop
-predicted at 86.34 s against 86.0 observed, landing index 9.5 against a true 7 —
-2.5 pockets. The propagated 1-sigma spread is 11.6 pockets, so a 9-pocket zone
-carries only about 28% confidence: the single-spin hit is not evidence that the
-method is that good.
+**What the extrapolation should aim at.** Aiming it at "the ball leaves the rim"
+was the mistake. That is not a fixed speed: where the ball leaves depends on
+which deflector it meets, and on the reference footage the exit speed varies
+by 4% and the exit azimuth by 120 degrees. Aiming instead at the *transfer
+speed* :data:`OMEGA_TRANSFER_DEG_S` — the speed at r = 0.95 of the bowl radius,
+which is set by the bowl's geometry and measured at 93.6 +- 1.0 deg/s across
+four spins — is well posed. On spin A with a 72.0 s cutoff the crossing is
+predicted at 84.27 s against 84.65 s measured, an error of 0.38 s (bootstrap
+spread 0.24 s), where the old target gave more than a second.
+
+Everything downstream of that crossing — the rest of the descent, the deflector
+and the bounce — is not predicted but *measured*, once, as a spread: 6.2 pockets
+over four spins. See the README for the resulting zone coverage and for why four
+spins cannot make it statistically significant.
 """
 
 from __future__ import annotations
@@ -36,6 +43,20 @@ import numpy as np
 from .config import WheelConfig
 from .realstream import unwrap_predictive
 from .sidetrack import reject_static
+
+
+#: Speed at which the ball crosses r = 0.95 of the bowl radius, in deg/s.
+#:
+#: This is the target the extrapolation aims at, and getting it from a
+#: measurement rather than a guess is what made the drop time predictable. The
+#: earlier value, 55 deg/s, stood for "the ball leaves the rim" — an event that
+#: is not a fixed speed at all, because it depends on which deflector the ball
+#: happens to meet. The r = 0.95 crossing is different: the ball's radius is set
+#: by gravity against the bowl slope, so the speed there is a property of the
+#: wheel. Measured with :func:`prophetvision.impactmeas.speed_at_radius` on four
+#: spins of the reference footage: 93.6 +- 1.0 deg/s, a spread of 1.0%. On spin
+#: A the predicted crossing moved from 1.2 s of error to 0.38 s.
+OMEGA_TRANSFER_DEG_S = 93.6
 
 
 @dataclass
@@ -59,12 +80,13 @@ class WheelDecay:
         return cls(c0=float(max(c0, 1e-6)), c2=float(max(c2, 1e-12)))
 
     def roll(self, omega0: float, t0: float, t1: float | None = None,
-             omega_drop: float = 55.0, dt: float = 0.002,
+             omega_drop: float = OMEGA_TRANSFER_DEG_S, dt: float = 0.002,
              max_span: float = 60.0):
         """Integrate forward. Returns (omega, travel_deg, t).
 
         Stops at ``t1`` if given, otherwise when the speed reaches
-        ``omega_drop`` — the speed at which the ball leaves the rim.
+        ``omega_drop``, which defaults to the measured transfer speed
+        :data:`OMEGA_TRANSFER_DEG_S` rather than a nominal rim-exit speed.
         """
         w = float(omega0)
         travel = 0.0
@@ -198,7 +220,8 @@ def fit_speed(t, theta_unwrapped, decay: WheelDecay,
 def predict_early(detections, cutoff: float, decay: WheelDecay,
                   rotor: RotorModel, r_band=(1.00, 1.40),
                   min_conf: float = 0.45, t_start: float | None = None,
-                  omega_drop: float = 55.0, n_boot: int = 120,
+                  omega_drop: float = OMEGA_TRANSFER_DEG_S,
+                  n_boot: int = 120,
                   anchor_sigma_pockets: float = 1.3,
                   n_mc: int = 4000, seed: int = 0,
                   wheel: WheelConfig | None = None) -> EarlyPrediction:
