@@ -138,6 +138,27 @@ actuelle est sous le seuil. La vidéo est compatible avec une bille présente
 avant la fermeture des paris. Affirmer l'inverse serait confondre « je ne vois
 pas » et « il n'y a rien » — l'erreur commise trois fois dans ce projet.
 
+## Détecteur appris (YOLO ONNX) — état mesuré
+
+Le modèle `ball_sota_yolo11n_320_fp16.onnx` fourni avec le dépôt est enveloppé
+par `balldetect.py`. Deux faits mesurés conditionnent son usage :
+
+- **Échelle.** Le réseau est en 320×320. Sur l'image entière (1206×910) la
+  bille tombe à ~4 px et n'est jamais trouvée. Sur une tuile 320 à résolution
+  native centrée sur la bille, il la localise à **5 px près avec 0,80 de
+  confiance**. L'inférence doit donc être **par tuiles à résolution native**.
+- **La tourelle est un négatif difficile.** Sur une fenêtre plongeante où la
+  bille est certainement sur le rebord, un balayage naïf a produit **417
+  détections à r = 0,4-0,6 R** (le moyeu doré et ses bras : ronds, brillants,
+  couleur bille) contre **3 seulement sur l'anneau de la bille**. D'où la porte
+  radiale (`radial_gate`) et le plancher de confiance.
+
+`BallDetector.evaluate()` mesure le taux de succès contre une trajectoire de
+référence : c'est ce chiffre, et non une impression, qui décide si un résultat
+négatif de ce détecteur signifie quelque chose. En l'état, le balayage par
+tuiles n'est **pas** encore un détecteur fiable sur ce flux — il lui manque une
+suppression des faux positifs de la tourelle et une couche de suivi.
+
 ## Contexte : la fenêtre de paris sur ce flux
 
 La vidéo analysée (3 min 57, 954×720) est un **enregistrement d'écran d'une
