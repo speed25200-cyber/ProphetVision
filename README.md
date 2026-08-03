@@ -173,7 +173,37 @@ avec des vides de 0,5 s. Deux corrections :
 
 Zone 18 jetons : `[0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23]`
 
-## Résultat final, mesuré sur 5 spins : le rebond annule l'avantage
+## ⚠️ La mesure du point d'impact n'est pas encore fiable
+
+Deux implémentations indépendantes de la **même** mesure ont été comparées sur
+les mêmes spins. Elles divergent :
+
+| spin | mesure A | mesure B | écart |
+|---|---|---|---|
+| 4 | 2,21 | 2,75 | **0,54 poche** |
+| 5 | 24,14 | 10,14 | **14,0 poches** |
+| 1 | 12,91 | 33,54 | **16,4 poches** |
+
+Et cela renverse complètement la conclusion :
+
+| Jeu de mesures | σ_rebond | **18 jetons** |
+|---|---|---|
+| A | 11,4 poches | **53,7 %** |
+| B | 4,1 poches | **86,8 %** |
+
+**La « dispersion du rebond » que je croyais mesurer est donc en grande partie
+du bruit de mesure sur le point d'impact, pas de la physique.** Aucun des deux
+chiffres n'est utilisable tant que la mesure d'impact n'est pas rendue robuste.
+
+Ce que la comparaison enseigne, concrètement : la mesure fiable exige de
+détecter les **coupures caméra** à l'intérieur de la fenêtre (une coupure à
+35,45 s invalidait toute la première partie du spin 1), de n'utiliser qu'un
+**arc terminal contigu à pleine cadence**, et de **vérifier visuellement** le
+passage de la bille dans la couronne. La mesure qui applique ces trois
+précautions (jeu A pour le spin 1) est mieux étayée ; la mesure rapide ne l'est
+pas.
+
+## Mesure sur 5 spins avec le jeu A (à consolider)
 
 Les cinq tours de la vidéo ont été mesurés. Résultats officiels lus à l'écran et
 **chacun vérifié par ses deux voisins de roue** (le jeu affiche le gagnant
