@@ -123,7 +123,36 @@ extrapolé à 81,4 s, donne **−129 °/s**. La vue plongeante, après la coupur
 par une mesure totalement indépendante, donne **−130 °/s à 82,07 s**. Un accord
 à 1 % à travers un changement de caméra.
 
-### Zone produite depuis la vue latérale seule
+### Le vrai verrou, chiffré : la précision sur l'instant de chute
+
+Près du contact, la bille et le rotor ont des vitesses comparables et opposées.
+L'angle **relatif** bille-rotor — la seule quantité qui détermine la poche —
+évolue donc à `ω_bille − ω_rotor ≈ −76 − 66 = −142 °/s`. Une erreur Δt sur
+l'instant de chute se traduit en `142·Δt` degrés, soit **14,6 poches par
+seconde d'erreur**.
+
+D'où le critère, qui n'était pas visible avant de le calculer :
+
+| Zone visée | Erreur maximale admissible sur l'instant de chute |
+|---|---|
+| 9 poches (±4) | **Δt < 0,27 s** |
+| 13 poches (±6) | Δt < 0,41 s |
+| 21 poches (±10) | Δt < 0,68 s |
+
+Prédire l'instant de chute depuis la seule phase latérale demande d'extrapoler
+la décroissance jusqu'à la vitesse de décrochage. Meilleur résultat obtenu ici :
+chute prédite à **87,16 s contre 86,0 s observée, soit Δt = 1,16 s** — après
+avoir calibré (c₀, c₂) sur les deux phases (`c₀ = 17,5 °/s²`,
+`c₂ = 1,99×10⁻⁴`, exactes sur les deux décélérations mesurées 38,9 et
+19,2 °/s²). Cela donne **σ = 19 poches**, c'est-à-dire une prédiction
+pratiquement non informative sur une roue de 37.
+
+**Conclusion honnête** : avec l'instant de chute laissé libre — le vrai régime
+« vue latérale seule » — la zone n'est pas exploitable aujourd'hui. Il faut
+diviser l'erreur sur l'instant de chute par ~4. C'est un objectif précis et
+mesurable, pas un obstacle de principe.
+
+### Zone sous hypothèse d'instant de contact connu
 
 Images utilisées : **71,70 → 80,05 s**, soit entièrement avant la coupure
 caméra (81,47 s). 86 détections, modèle physique ajusté (résidu 4,6°).
@@ -142,10 +171,13 @@ Budget d'erreur par Monte-Carlo (ancre rotor ±1,3 poche, instant de contact
 
 Zone 13 poches : `[25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5]`
 
-Autrement dit : à 3,6 poches de σ, une zone de 9 poches est **trop étroite** —
-elle rate le résultat sur ce spin. Il faut 13 poches pour atteindre ~90 % de
-couverture. C'est la précision réelle en vue latérale aujourd'hui, mesurée et
-non postulée, sur **un seul spin** — ce qui n'est pas une validation
+⚠️ **Ce tableau suppose l'instant de contact connu à ±0,5 s.** Cette
+information vient de la vue plongeante et n'est donc PAS disponible en régime
+latéral pur : c'est une hypothèse, pas un résultat. Levée, elle fait passer σ
+de 3,6 à 19 poches (section précédente). Le chiffre à retenir pour un usage
+réel est le second.
+
+Sur un seul spin, dans les deux cas — ce qui n'est pas une validation
 statistique.
 
 ### Ce qui limite la précision depuis le latéral
