@@ -1,0 +1,7 @@
+codec_name=h264
+width=1206
+height=910
+r_frame_rate=60/1
+avg_frame_rate=1347000/23749
+duration=237.490000
+nb_frames=13470
