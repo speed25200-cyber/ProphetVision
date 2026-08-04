@@ -155,3 +155,40 @@ def test_integrate_to_is_monotone_in_travel():
     t = np.linspace(0.0, 1.0, 20)
     tr = _integrate_to(t, 600.0, d)
     assert np.all(np.diff(tr) < 0)          # azimuth decreases throughout
+
+
+def test_transfer_calibration_recovers_a_known_scale():
+    """A wheel whose decay really is 6% slower than the coefficients say: the
+    calibration has to find that, because on real footage it is exactly this
+    kind of constant offset that the extrapolation turns into a second of
+    error."""
+    from prophetvision.earlyside import (OMEGA_TRANSFER_DEG_S,
+                                         TransferCalibration)
+    model = WheelDecay(c0=17.5, c2=2.0e-4)
+    true = WheelDecay(c0=17.5 / 1.06, c2=2.0e-4 / 1.06)
+    speeds = np.array([360.0, 440.0, 480.0, 520.0, 570.0])
+    rem = np.array([true.time_to(w, OMEGA_TRANSFER_DEG_S) for w in speeds])
+    cal = TransferCalibration.fit(speeds, rem, model)
+    assert cal.scale == pytest.approx(1.06, rel=1e-3)
+    assert cal.n_spins == 5
+    for w, r in zip(speeds, rem):
+        assert cal.remaining(w) == pytest.approx(r, abs=0.02)
+    assert cal.transfer_time(72.0, 480.0) == pytest.approx(
+        72.0 + cal.remaining(480.0))
+
+
+def test_transfer_calibration_refuses_empty_input():
+    from prophetvision.earlyside import TransferCalibration
+    d = WheelDecay(c0=17.5, c2=2.0e-4)
+    with pytest.raises(ValueError):
+        TransferCalibration.fit([], [], d)
+    with pytest.raises(ValueError):
+        TransferCalibration.fit([400.0, 500.0], [12.0], d)
+
+
+def test_an_uncalibrated_scale_is_the_identity():
+    from prophetvision.earlyside import OMEGA_TRANSFER_DEG_S, TransferCalibration
+    d = WheelDecay(c0=17.5, c2=2.0e-4)
+    cal = TransferCalibration(decay=d)
+    assert cal.remaining(500.0) == pytest.approx(
+        d.time_to(500.0, OMEGA_TRANSFER_DEG_S))

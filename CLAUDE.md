@@ -61,29 +61,53 @@ Conséquences pour le pipeline :
 - La vue plongeante ne peut servir qu'à la vérification a posteriori du
   résultat, jamais à la prédiction.
 
-## RÉSULTAT ÉTABLI (2026-08-04) — 18 jetons, 51,2 %. OBJECTIF NON ATTEINT.
+## RÉSULTAT ÉTABLI (2026-08-04, v2) — 61,8 % sur 21 jetons, en LOO
 
-**Le 69,6 % annoncé la veille était faux** : son terme de prédiction reposait
-sur **un seul tour**. Testé sur les quatre tours qui ont des images latérales,
-ce terme passe de 6,3 à **13,4 poches** et absorbe tout l'avantage.
+Tous les chiffres en **validation croisée leave-one-out** (5 tours, calibration
+de chaque tour ajustée sur les 4 autres). Les cinq tours sont maintenant
+prédits, pas un seul.
 
-- Bug réel trouvé au passage : **le déroulé d'angle perdait des tours** (résidus
-  111°, 139°, 231° sur 3 tours sur 4). Correctif : `fit_speed_circular` — ne
-  jamais dérouler, voter sur l'azimut enroulé. rms 1,71 s → **0,73 s**.
-- Le −0,38 s du tour A était de la chance : le même tour rescanné donne +1,06 s.
-- Budget : prédiction **13,45** ⊕ dispersion aval **6,55** = **14,96 poches**
-  → 18 jetons = **51,2 %** (plancher 48,6 %). Balayage de la vitesse cible :
-  plat entre 49,7 et 51,9 % — ce n'est pas un paramètre mal réglé.
-- **Le verrou est la vitesse à la coupure** (connue à 5-14 % près). Avec un
-  instant de transfert exact, 18 jetons donneraient **74 %** : le rebond n'est
-  pas le problème. Il faut diviser l'erreur de vitesse par 2 à 4.
-- **La vidéo ne contient que 5 tours** et ils sont tous utilisés. Le 6e (résultat
-  34) s'est immobilisé avant t = 0 — vérifié à l'image. Pour n > 5 il faut
-  d'autres enregistrements.
+| Mise | Couverture | Plancher | Avantage |
+|---|---|---|---|
+| 18 | 53,9 % | 48,6 % | +5,2 |
+| **21** | **61,8 %** | 56,8 % | **+5,1** |
+| 24 | 69,5 % | 64,9 % | +4,6 |
+
+**L'objectif « ≥ 60 % » est tenu à partir de 21 jetons.** Mais ne jamais le
+présenter sans la colonne « avantage » : élargir la zone monte le taux affiché
+*et* le plancher ; les ~5 points d'avantage sont toute l'information extraite.
+
+Trois choses ont produit ce résultat :
+
+1. **Ne jamais dérouler l'angle** (`fit_speed_circular`). Le déroulé prédictif
+   perdait des tours (résidus 111°, 139°, 231° sur 3 tours sur 4). On vote sur
+   l'azimut **enroulé** ; concentration 0,97-0,99 après refit sur inliers.
+2. **La vitesse ajustée n'est pas le problème** : `corr(ω_coupure, temps
+   restant) = 0,975`. C'est la **conversion vitesse → temps** qui était fausse.
+   `TransferCalibration` ajuste un seul facteur d'échelle sur la roue (×1,058,
+   stable à ±0,015 sur les replis). Deux paramètres sur-apprennent (LOO 0,64 s).
+3. Erreurs LOO : −0,87 / +0,39 / +0,10 / +0,91 / −0,45 s → **rms 0,624 s**.
+
+Budget : prédiction **11,43** ⊕ dispersion aval **6,55** = **13,18 poches**.
+
+**Verrou restant** : il faut 0,48 s rms pour tenir 60 % à *18* jetons (on est à
+0,62). Avec un instant exact, 18 jetons donneraient 74 % — le rebond n'est pas
+le problème. La fenêtre exploitable ne dure ~1 s (les détections se concentrent
+dans les 0,5 s avant coupure), ce qui limite la courbure mesurable.
+
+**La vidéo ne contient que 5 tours** et ils sont tous utilisés. Le 6e (résultat
+34) s'est immobilisé avant t = 0 — vérifié à l'image.
 
 Fixtures : `tests/data/spins_rim.npz` (rebord, 5 tours) et
-`tests/data/side_dets.npz` (latéral, 4 tours). `tests/test_real_spins.py` et
+`tests/data/side_dets.npz` (latéral, 5 tours). `tests/test_real_spins.py` et
 `tests/test_prediction_on_all_spins.py` re-dérivent tous les chiffres publiés.
+
+### Chiffres antérieurs retirés (ne pas les ressortir)
+
+- **69,6 %** : terme de prédiction mesuré sur **un seul tour**, et instable
+  (le même tour rescanné donnait +1,06 s au lieu de −0,38 s).
+- **51,2 %** : déroulé d'angle cassé, aucune calibration de roue.
+- **σ = 4,4 poches** : non reproductible avec le code du dépôt.
 
 ## Acquis qui tiennent toujours
 

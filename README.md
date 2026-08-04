@@ -18,23 +18,31 @@ distribution circulaire d'écart de poches, apprise spin après spin.
 Mesuré sur la vidéo de référence, prédiction émise **2 s avant l'animation des
 multiplicateurs**, depuis la **vue latérale seule** :
 
-| | |
-|---|---|
-| Zone jouée | **18 jetons** sur 37 |
-| Couverture mesurée | **51,2 %** |
-| Au hasard, même mise | 48,6 % |
-| Tours utilisés | **5** mesurés, **4** prédits (toute la vidéo) |
-| Verdict | **l'objectif 60-70 % n'est pas atteint** |
+Tous les chiffres sont en **validation croisée leave-one-out** : la
+calibration de chaque tour est ajustée sur les quatre autres. Avec cinq tours,
+c'est le seul type de chiffre publiable.
 
-⚠️ **Une version antérieure de ce README annonçait 69,6 %. C'était faux, et la
-cause est instructive.** Ce chiffre reposait sur **un seul tour** pour le terme
-de prédiction. Testé sur les quatre tours qui disposent d'images latérales
-exploitables, ce terme passe de 6,3 à **13,4 poches** et absorbe tout
-l'avantage. Le détail est dans « Ce que le passage à quatre tours a changé ».
+| Mise | Couverture | Au hasard | Avantage réel |
+|---|---|---|---|
+| 13 jetons | 39,8 % | 35,1 % | +4,7 |
+| 18 jetons | 53,9 % | 48,6 % | +5,2 |
+| **21 jetons** | **61,8 %** | 56,8 % | **+5,1** |
+| 24 jetons | 69,5 % | 64,9 % | +4,6 |
 
-Le terme aval, lui, tient : **si l'instant de transfert était connu
-exactement, 18 jetons couvriraient 74 %**. Ce n'est donc pas le rebond qui
-bloque — c'est la précision sur l'instant.
+**Un taux ≥ 60 % est atteint à partir de 21 jetons (61,8 %).** Mais lisez la
+colonne de droite : **l'avantage réel sur le hasard est de ~5 points**, quelle
+que soit la mise. Élargir la zone monte le taux affiché *et* le plancher. Les
+5 points, eux, ne bougent pas — c'est toute l'information que le système
+extrait aujourd'hui.
+
+⚠️ **Deux chiffres antérieurs de ce README ont été retirés** (69,6 % puis
+51,2 %) : le premier reposait sur **un seul tour** pour le terme de prédiction,
+le second n'avait pas de calibration de roue. Les cinq tours sont maintenant
+prédits, en LOO. Détail dans « Ce que le passage à cinq tours a changé ».
+
+Le terme aval tient : **avec un instant de transfert exact, 18 jetons
+couvriraient 74 %**. Ce n'est pas le rebond qui bloque, c'est la précision sur
+l'instant — 0,62 s rms là où il en faudrait 0,48.
 
 ## Architecture
 
@@ -76,7 +84,7 @@ sans rien connaître de la vérité terrain.
   de masse de probabilité (le hasard pur : 24 %).
 
 ```
-python -m pytest tests/          # 95 tests, dont ceux qui re-dérivent
+python -m pytest tests/          # 100 tests, dont ceux qui re-dérivent
                                  # les chiffres réels publiés plus bas
 ```
 
@@ -266,95 +274,96 @@ Les détections de rebord des cinq tours sont figées dans
 `tests/data/spins_rim.npz` et `tests/test_real_spins.py` re-dérive chacun des
 chiffres publiés ici sans la vidéo.
 
-## Ce que le passage à quatre tours a changé
+## Ce que le passage à cinq tours a changé
 
 Résultats officiels lus à l'écran et **chacun vérifié par ses deux voisins de
-roue** (le jeu affiche le gagnant encadré de ses voisins réels), puis recoupés
-avec le bandeau d'historique : 27, 25, 9, 1, 31.
+roue**, puis recoupés avec le bandeau d'historique : 27, 25, 9, 1, 31.
 
-La prédiction n'avait été évaluée que sur le tour A. Les quatre tours qui
-disposent d'images latérales exploitables ont été balayés de la même façon
-(fenêtre de 3,3 s finissant 2 s avant l'animation, seuil YOLO 0,20). Deux
-choses en sont sorties.
+La prédiction n'avait été évaluée que sur le tour A. Les cinq tours ont
+maintenant été balayés (fenêtre finissant 2 s avant l'animation, seuil YOLO
+0,08, ~310 détections brutes par tour). Trois choses en sont sorties.
 
-**1. Un bug réel : le déroulé d'angle perdait des tours.** À 500-600 °/s la
-bille boucle en 0,6-0,7 s et les détections latérales sont trouées ; un déroulé
-prédictif qui se trompe d'un tour est décalé de 360° pour tout le reste de la
-fenêtre. Résidus mesurés : **111°, 139°, 231°** sur trois tours sur quatre — le
-suivi ne suivait pas la bille du tout, et le seul tour où il tombait juste
-était celui sur lequel tout reposait.
+### 1. Le déroulé d'angle perdait des tours
+
+À 500-600 °/s la bille boucle en 0,6-0,7 s et les détections latérales sont
+trouées ; un déroulé prédictif qui se trompe d'un tour est décalé de 360° pour
+tout le reste. Résidus : **111°, 139°, 231°** sur trois tours sur quatre.
 
 Correctif : **ne jamais dérouler** (`fit_speed_circular`). Pour chaque vitesse
 candidate on retranche le trajet analytique de l'azimut **enroulé** ; la bonne
-vitesse laisse une phase constante quel que soit le nombre de tours, la
-mauvaise l'étale sur le cercle. Le score est la longueur du vecteur résultant,
-lisible comme une confiance (0,61-0,82 ici, plancher de bruit ≈ 0,15).
+vitesse laisse une phase constante quel que soit le nombre de tours. Le score
+est la longueur du vecteur résultant, lisible comme une confiance — **0,97 à
+0,99** sur quatre tours après refit sur les inliers, contre un plancher de
+bruit de 0,15.
 
-| | déroulé (avant) | circulaire (après) |
-|---|---|---|
-| tour A | +1,06 s | **−0,25 s** |
-| tour B | −0,35 s | **−0,58 s** |
-| tour 4 | −0,90 s | **+0,17 s** |
-| tour 5 | −3,11 s | **−1,31 s** |
-| **rms** | **1,71 s** | **0,73 s** |
+### 2. La vitesse ajustée n'était pas le maillon faible
 
-**2. Le −0,38 s du tour A était de la chance.** Le même tour, rescanné avec un
-autre jeu de détections, donnait **+1,06 s**. Sur quatre tours le rms est de
-**0,73 s**, soit **13,4 poches** à 18,3 poches/s.
+`corr(vitesse à la coupure, temps réellement restant) = 0,975` sur cinq tours.
+Ce qui était faux, c'est la **conversion vitesse → temps** : elle vient de
+coefficients `(c₀, c₂)` mesurés ailleurs, et l'erreur qu'ils produisent croît
+avec la longueur de l'extrapolation — signature d'un *taux* de décroissance
+faux d'un facteur constant (10,2 s d'extrapolation → −0,61 s ; 14,1 s →
+−1,45 s).
 
-### Le budget, corrigé
+`TransferCalibration` ajuste ce seul facteur sur la roue elle-même
+(**×1,058**, stable à ±0,015 sur les cinq replis). Deux paramètres — laisser
+c₀ et c₂ bouger séparément — **sur-apprend** : le LOO se dégrade à 0,64 s.
+
+| conversion vitesse → temps | rms LOO | 18 jetons | 21 jetons |
+|---|---|---|---|
+| loi de décroissance telle quelle | 0,851 s | 49,7 % | 57,8 % |
+| **échelle calibrée (1 paramètre)** | **0,624 s** | **53,9 %** | **61,8 %** |
+| c₀ et c₂ libres (2 paramètres) | 0,639 s | 53,4 % | 61,4 % |
+
+### 3. Le tour A était de la chance
+
+Le même tour, rescanné avec un autre jeu de détections, passait de −0,38 s à
++1,06 s. Erreurs LOO sur les cinq tours : **−0,87 / +0,39 / +0,10 / +0,91 /
+−0,45 s**, rms **0,624 s**.
+
+### Le budget
 
 | terme | mesure | σ |
 |---|---|---|
-| prédiction de l'instant de transfert | 4 tours, rms 0,73 s × 18,3 poches/s | **13,45 poches** |
+| instant de transfert | 5 tours en LOO, rms 0,624 s × 18,3 poches/s | **11,43 poches** |
 | transfert → poche payée | 5 tours, sans ancrage | **6,55 poches** |
-| **total** | quadrature | **14,96 poches** |
+| **total** | quadrature | **13,18 poches** |
 
-| Mise | Couverture | Plancher (W/37) | Écart |
+| Mise | Couverture | Plancher | Avantage |
 |---|---|---|---|
-| 13 | 37,1 % | 35,1 % | +2,0 |
-| **18** | **51,2 %** | 48,6 % | **+2,6** |
-| 21 | 59,3 % | 56,8 % | +2,5 |
+| 13 | 39,8 % | 35,1 % | +4,7 |
+| 18 | 53,9 % | 48,6 % | +5,2 |
+| **21** | **61,8 %** | 56,8 % | **+5,1** |
+| 24 | 69,5 % | 64,9 % | +4,6 |
 
-**Sur 18 jetons : 51,2 % contre 48,6 % au hasard. L'objectif 60-70 % n'est pas
-atteint**, et l'écart de 2,6 points est très en deçà de ce que cinq tours
-permettraient de distinguer du hasard.
+### Où est le verrou, chiffré
 
-Le choix de la vitesse cible n'y change rien — c'est un balayage, pas un
-paramètre ajusté :
+Le terme aval est bon : **avec un instant de transfert exact, 18 jetons
+couvriraient 74 %**. Tout le déficit vient de l'instant. La sensibilité est
+`dt/dω ≈ 0,017 s par °/s` à 450 °/s :
 
-| ω* visée (°/s) | 80 | 85 | 90 | 93,6 | 100 | 105 | 110 |
-|---|---|---|---|---|---|---|---|
-| 18 jetons | 51,9 % | 51,6 % | 51,3 % | 51,2 % | 50,3 % | 49,9 % | 49,7 % |
-
-### Où est le verrou, précisément
-
-Le terme aval est bon : **avec un instant de transfert connu exactement, 18
-jetons couvriraient 74 %**. Tout le déficit vient de la vitesse au moment de la
-coupure, connue à **5-14 %** près selon le tour. La sensibilité est
-`dt/dω ≈ 0,017 s par °/s` à 450 °/s, donc :
-
-| précision sur ω à la coupure | erreur sur l'instant | 18 jetons |
+| rms sur l'instant | σ total | 18 jetons |
 |---|---|---|
-| 14 % (pire tour actuel) | 1,1 s | ~49 % |
-| **8 % (rms actuel)** | **0,73 s** | **51 %** |
-| 4 % | 0,31 s | ~68 % |
-| 2 % | 0,16 s | ~73 % |
+| 0,85 s (non calibré) | 16,9 | 49,7 % |
+| **0,62 s (aujourd'hui)** | **13,2** | **53,9 %** |
+| 0,48 s | 10,9 | 60,0 % |
+| 0,30 s | 8,3 | 72,0 % |
 
-**Il faut diviser l'erreur de vitesse par deux à quatre.** C'est un objectif
-chiffré et vérifiable, pas un obstacle de principe — mais il n'est pas atteint,
-et rien dans ce dépôt ne doit être lu comme s'il l'était.
+**Il reste un facteur ~1,3 à gagner sur l'instant pour tenir 60 % à 18 jetons.**
+La fenêtre exploitable ne dure qu'environ une seconde (les détections se
+concentrent dans les 0,5 s avant la coupure), ce qui limite la courbure
+mesurable et donc la qualité de l'extrapolation sur 10-14 s. C'est là qu'il
+faut travailler, et il faut plus de tours pour calibrer mieux.
 
 ### Combien de tours contient la vidéo
 
 Cinq, et ils sont tous utilisés. La vidéo fait 237,49 s pour une cadence de
 46,0 s par tour. L'enregistrement démarre **en cours de tour** : à t = 0 la vue
 plongeante est déjà à l'écran, mais la bille est à r ≈ 0,5, immobilisée, et le
-marqueur de résultat (**34**, encadré de 17 et 6) apparaît à t = 1,0 s. La
-sortie de rebord de ce tour-là s'est produite vers t = −5 s, avant le début de
-l'enregistrement — vérifié sur les images, pas seulement par extrapolation. La
-fenêtre 0-26 s est extraite par le workflow et ne contient pas de sixième
-mesure.
+marqueur de résultat (**34**, encadré de 17 et 6) apparaît à t = 1,0 s. Sa
+sortie de rebord s'est produite vers t = −5 s, avant le début de
+l'enregistrement — vérifié sur les images. La fenêtre 0-26 s est extraite par
+le workflow et ne contient pas de sixième mesure.
 
 **Pour dépasser n = 5, il faut d'autres enregistrements.** Aucun traitement ne
 fabriquera de l'information statistique qui n'est pas dans ces 237 secondes.
@@ -370,7 +379,8 @@ les invalidait :
 | 5 tours, « jeu A » | 53,7 % | cercle calibré sur l'anneau des poches pour 2 tours |
 | 5 tours, « jeu B » | 86,8 % | pistes verrouillées sur des reflets fixes |
 | 4 tours, ancrage r = 0,95 | 69,6 % | terme de prédiction mesuré sur **1 seul** tour |
-| **5 tours mesurés, 4 prédits** | **51,2 %** | c'est le chiffre actuel |
+| 5 tours mesurés, 4 prédits | 51,2 % | déroulé d'angle cassé, pas de calibration de roue |
+| **5 tours, LOO, échelle calibrée** | **53,9 %** (18 j.) / **61,8 %** (21 j.) | chiffre actuel |
 
 Les deux chiffres du milieu diffèrent d'un facteur 1,6 sur les mêmes images :
 c'est la mesure du point d'impact qui bougeait, pas la physique. C'est ce

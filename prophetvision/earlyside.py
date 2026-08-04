@@ -255,7 +255,8 @@ def fit_speed(t, theta_unwrapped, decay: WheelDecay,
 
 def fit_speed_circular(t, azimuth_deg, decay: WheelDecay,
                        omega_grid=np.arange(200.0, 1400.0, 0.5),
-                       weights=None):
+                       weights=None, refine: int = 2,
+                       inlier_tol_deg: float = 25.0):
     """Fit the speed without ever unwrapping the azimuth.
 
     Unwrapping is where this pipeline was silently failing. At 500-600 deg/s
@@ -278,14 +279,79 @@ def fit_speed_circular(t, azimuth_deg, decay: WheelDecay,
     t = np.asarray(t, dtype=float)
     az = np.asarray(azimuth_deg, dtype=float)
     grid = np.asarray(omega_grid, dtype=float)
-    w = (np.ones(len(t)) if weights is None
-         else np.asarray(weights, dtype=float))
-    w = w / w.sum()
+    w0 = (np.ones(len(t)) if weights is None
+          else np.asarray(weights, dtype=float)).astype(float)
     travel = decay.travel(grid[:, None], (t - t[0])[None, :])
-    z = (np.exp(1j * np.radians(az[None, :] - travel)) * w[None, :]).sum(axis=1)
-    j = int(np.argmax(np.abs(z)))
-    return (float(np.abs(z[j])), float(grid[j]),
-            float(np.degrees(np.angle(z[j])) % 360.0))
+    phase = np.radians(az[None, :] - travel)
+
+    w = w0 / w0.sum()
+    best = None
+    for _ in range(1 + max(0, int(refine))):
+        z = (np.exp(1j * phase) * w[None, :]).sum(axis=1)
+        j = int(np.argmax(np.abs(z)))
+        best = (float(np.abs(z[j])), float(grid[j]),
+                float(np.degrees(np.angle(z[j])) % 360.0))
+        if refine <= 0:
+            break
+        # Keep only what the winning trajectory explains and vote again. The
+        # detector is run at a low threshold to get the ball on as many frames
+        # as possible, which necessarily lets clutter in; the clutter has no
+        # consistent phase, so one pass identifies it and the refit is cleaner.
+        resid = np.abs(np.angle(np.exp(1j * (phase[j] - np.radians(best[2])))))
+        keep = resid <= np.radians(inlier_tol_deg)
+        if keep.sum() < max(10, 0.25 * len(t)):
+            break
+        w = np.where(keep, w0, 0.0)
+        if w.sum() <= 0:
+            break
+        w = w / w.sum()
+    return best
+
+
+@dataclass
+class TransferCalibration:
+    """Speed at the cutoff -> time remaining until the transfer, per wheel.
+
+    The decay law converts one to the other from coefficients measured on some
+    other wheel, and on the reference footage it is wrong in a very specific
+    way: the error grows with the length of the extrapolation, which is the
+    signature of a decay *rate* that is off by a constant factor. Left
+    uncalibrated it costs 0.85 s rms; one fitted scale brings that to 0.62 s.
+
+    The fitted speed itself is not the weak link — it correlates 0.975 with the
+    time the ball actually takes. Only the conversion needs calibrating, which
+    is why one parameter is enough and two (letting c0 and c2 move separately)
+    measurably overfits: leave-one-out gets *worse*, 0.64 s.
+
+    Calibrate once per wheel and camera from spins whose transfer instant has
+    been measured in the top-down view, then reuse it.
+    """
+
+    decay: WheelDecay
+    scale: float = 1.0
+    omega_transfer: float = OMEGA_TRANSFER_DEG_S
+    n_spins: int = 0
+
+    @classmethod
+    def fit(cls, speeds, remaining, decay: WheelDecay,
+            omega_transfer: float = OMEGA_TRANSFER_DEG_S) -> "TransferCalibration":
+        """Least-squares scale on the model's predicted remaining time."""
+        w = np.asarray(speeds, dtype=float)
+        rem = np.asarray(remaining, dtype=float)
+        if len(w) != len(rem) or len(w) == 0:
+            raise ValueError("need matching, non-empty speeds and times")
+        model = np.array([decay.time_to(x, omega_transfer) for x in w])
+        scale = float((model * rem).sum() / (model * model).sum())
+        return cls(decay=decay, scale=scale, omega_transfer=omega_transfer,
+                   n_spins=len(w))
+
+    def remaining(self, omega_at_cutoff: float) -> float:
+        """Seconds from the cutoff until the ball reaches the transfer speed."""
+        return self.scale * self.decay.time_to(float(omega_at_cutoff),
+                                               self.omega_transfer)
+
+    def transfer_time(self, cutoff: float, omega_at_cutoff: float) -> float:
+        return float(cutoff) + self.remaining(omega_at_cutoff)
 
 
 def predict_early(detections, cutoff: float, decay: WheelDecay,
