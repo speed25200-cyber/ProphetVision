@@ -61,23 +61,42 @@ Conséquences pour le pipeline :
 - La vue plongeante ne peut servir qu'à la vérification a posteriori du
   résultat, jamais à la prédiction.
 
-## RÉSULTAT ÉTABLI (2026-08-03) — 18 jetons, 69,6 % en estimation ponctuelle
+## RÉSULTAT ÉTABLI (2026-08-04) — 18 jetons, 51,2 %. OBJECTIF NON ATTEINT.
 
-Chaîne mesurée de bout en bout, prédiction depuis le latéral seul :
+**Le 69,6 % annoncé la veille était faux** : son terme de prédiction reposait
+sur **un seul tour**. Testé sur les quatre tours qui ont des images latérales,
+ce terme passe de 6,3 à **13,4 poches** et absorbe tout l'avantage.
 
-- **Ce qui a débloqué la prédiction** : ne plus extrapoler jusqu'à « la sortie
-  du rebord » (vitesse supposée 55 °/s — cible inexistante, l'azimut de sortie
-  varie de 152° à 272° sur les cinq tours) mais jusqu'à la **vitesse de
-  transfert mesurée** : `earlyside.OMEGA_TRANSFER_DEG_S = 93,6 °/s` au passage
-  à r = 0,95 du rayon de cuvette, dispersion **1,0 %** sur quatre tours. La
-  bille y est à un rayon fixé par la géométrie de la cuvette, donc la vitesse
-  y est une propriété de la roue. Erreur sur l'instant de passage :
-  **0,38 s** (contre > 1 s avant), soit 6,3 poches à 16,5 poches/s.
-- **Dispersion passage → poche payée** : 6,17 poches (4 tours, sans ancrage).
-- **σ total = 8,79 poches → 18 jetons = 69,6 %** (IC 90 % 64,2-82,4 ;
-  plancher hasard 48,6 %).
-- **Non significatif** : Rayleigh p = 0,28 sur quatre tours. Ne jamais
-  présenter ce 69,6 % comme démontré ; il faut ~20 tours.
+- Bug réel trouvé au passage : **le déroulé d'angle perdait des tours** (résidus
+  111°, 139°, 231° sur 3 tours sur 4). Correctif : `fit_speed_circular` — ne
+  jamais dérouler, voter sur l'azimut enroulé. rms 1,71 s → **0,73 s**.
+- Le −0,38 s du tour A était de la chance : le même tour rescanné donne +1,06 s.
+- Budget : prédiction **13,45** ⊕ dispersion aval **6,55** = **14,96 poches**
+  → 18 jetons = **51,2 %** (plancher 48,6 %). Balayage de la vitesse cible :
+  plat entre 49,7 et 51,9 % — ce n'est pas un paramètre mal réglé.
+- **Le verrou est la vitesse à la coupure** (connue à 5-14 % près). Avec un
+  instant de transfert exact, 18 jetons donneraient **74 %** : le rebond n'est
+  pas le problème. Il faut diviser l'erreur de vitesse par 2 à 4.
+- **La vidéo ne contient que 5 tours** et ils sont tous utilisés. Le 6e (résultat
+  34) s'est immobilisé avant t = 0 — vérifié à l'image. Pour n > 5 il faut
+  d'autres enregistrements.
+
+Fixtures : `tests/data/spins_rim.npz` (rebord, 5 tours) et
+`tests/data/side_dets.npz` (latéral, 4 tours). `tests/test_real_spins.py` et
+`tests/test_prediction_on_all_spins.py` re-dérivent tous les chiffres publiés.
+
+## Acquis qui tiennent toujours
+
+- **Vitesse de transfert** `earlyside.OMEGA_TRANSFER_DEG_S = 93,6 °/s` au
+  passage à r = 0,95 du rayon de cuvette, dispersion **1,0 %** sur quatre
+  tours. Le rayon y est fixé par la géométrie de la cuvette, donc la vitesse y
+  est une propriété de la roue. C'est la bonne cible d'extrapolation ; « la
+  sortie du rebord » n'en est pas une (azimut de sortie 152°-272°).
+- **Dispersion transfert → poche payée** : 6,55 poches sur les 5 tours, sans
+  ancrage. Suffisamment bon pour 74 % sur 18 jetons si l'instant était exact.
+- Forme close du modèle de décroissance (`time_to`, `speed_after`, `travel`) :
+  exacte et vectorisée, `fit_speed` passe de 765 000 itérations Python par
+  appel à une opération matricielle.
 
 Mesure d'impact rendue reproductible (`impactmeas.py`) après une divergence de
 14-16 poches entre deux implémentations. Quatre pièges, tous traités et

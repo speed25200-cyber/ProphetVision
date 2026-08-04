@@ -13,15 +13,18 @@ is wrong and must be updated with it.
 import numpy as np
 import pytest
 
-from prophetvision.earlyside import OMEGA_TRANSFER_DEG_S
+from prophetvision.earlyside import OMEGA_TRANSFER_DEG_S, WheelDecay
 from prophetvision.impactmeas import (bounce_spread, measure_impact,
-                                      speed_at_radius)
+                                      speed_at_radius, transfer_point)
 from prophetvision.zone import coverage_ci, wrapped_normal_coverage
 
 DATA = __file__.rsplit("/", 1)[0] + "/data/spins_rim.npz"
-# Spin A, 72.0 s cutoff: the r=0.95 crossing predicted 0.38 s early, and the
-# relative ball-rotor rate there is 16.5 pockets/s (see README).
-SIGMA_PRED = 0.38 * 16.48
+DECAY = WheelDecay(c0=17.5266174, c2=1.99170412e-4)
+#: rms error on the predicted transfer instant, over the four rounds that have
+#: side-view footage (see tests/test_prediction_on_all_spins.py), times the
+#: 18.32 pockets/s at which ball and rotor close. Measured on one spin this was
+#: 6.3; four spins put it at 13.4, and that is what sank the 18-chip claim.
+SIGMA_PRED = 0.734 * 18.32
 
 
 @pytest.fixture(scope="module")
@@ -86,28 +89,42 @@ def test_the_exit_is_not_a_wheel_constant(spins):
 
 
 def test_bounce_spread_and_win_rate_match_the_readme(spins):
-    """The published figures, end to end: spread from the predictable crossing
-    to the paid pocket, and the 18-chip coverage that follows."""
-    idx95, results = [], []
-    for name, (rows, rotor, res) in spins.items():
-        s = speed_at_radius(rows, rotor, r_target=0.95)
-        if s is None:
-            continue
-        idx95.append(s[2])
+    """The published figures, end to end: spread from the transfer crossing to
+    the paid pocket, and the 18-chip coverage once the real prediction error is
+    carried. This is the number the README quotes, and it is barely above the
+    48.6% floor."""
+    idx, results = [], []
+    for _name, (rows, rotor, res) in spins.items():
+        tp = transfer_point(rows, rotor, DECAY, OMEGA_TRANSFER_DEG_S)
+        assert tp is not None
+        idx.append(tp[1])
         results.append(res)
-    st = bounce_spread(idx95, results)
-    assert st["n"] == 4
-    assert st["sigma_pockets"] == pytest.approx(6.17, abs=0.05)
+    st = bounce_spread(idx, results)
+    assert st["n"] == 5
+    assert st["sigma_pockets"] == pytest.approx(6.55, abs=0.05)
 
     est = coverage_ci(st["v"], SIGMA_PRED, width=18, seed=0, n_boot=6000)
-    assert est.sigma_total == pytest.approx(8.79, abs=0.05)
-    assert est.point == pytest.approx(0.696, abs=0.005)
-    assert est.point > est.floor
+    assert est.sigma_total == pytest.approx(14.96, abs=0.1)
+    assert est.point == pytest.approx(0.512, abs=0.005)
     assert est.point == pytest.approx(
         wrapped_normal_coverage(est.sigma_total, 18), abs=1e-9)
-    # ...and four spins cannot make that significant, whatever the point value
+    assert est.point - est.floor < 0.03      # indistinguishable from chance
     assert est.rayleigh_p > 0.05
     assert not est.beats_chance
+
+
+def test_the_bounce_term_alone_would_have_been_enough(spins):
+    """Worth keeping separate, because it says where the work has to go: if the
+    transfer instant were known exactly, 18 chips would cover 74%. The scatter
+    after the transfer is not what is blocking the target — the prediction
+    is."""
+    idx, results = [], []
+    for _name, (rows, rotor, res) in spins.items():
+        idx.append(transfer_point(rows, rotor, DECAY, OMEGA_TRANSFER_DEG_S)[1])
+        results.append(res)
+    st = bounce_spread(idx, results)
+    perfect = wrapped_normal_coverage(st["sigma_pockets"], 18)
+    assert perfect > 0.70
 
 
 def test_the_rim_exit_anchor_is_reported_too(spins):

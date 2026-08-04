@@ -94,6 +94,61 @@ def test_robust_fit_discards_outliers_and_tightens_the_speed():
     assert abs(w0 - true_w) < 12.0, w0
 
 
+def test_closed_form_matches_the_integrator():
+    """`roll` steps at 2 ms; the closed form is exact. They must agree, because
+    the closed form is what the prediction now runs on."""
+    d = WheelDecay(c0=17.5, c2=2.0e-4)
+    w_end, travel, t_end = d.roll(600.0, 0.0, omega_drop=93.6)
+    assert t_end == pytest.approx(d.time_to(600.0, 93.6), abs=0.01)
+    assert d.speed_after(600.0, t_end) == pytest.approx(93.6, abs=0.5)
+    assert float(d.travel(600.0, t_end)) == pytest.approx(travel, rel=2e-3)
+
+
+def test_travel_broadcasts_over_a_speed_grid():
+    d = WheelDecay(c0=17.5, c2=2.0e-4)
+    grid = np.array([400.0, 600.0, 800.0])
+    dt = np.array([0.0, 0.5, 1.0])
+    out = d.travel(grid[:, None], dt[None, :])
+    assert out.shape == (3, 3)
+    assert np.allclose(out[:, 0], 0.0)
+    assert np.all(np.diff(out[:, -1]) < 0)      # faster ball travels further
+
+
+def test_circular_fit_survives_lap_ambiguity():
+    """The bug this replaced: at 600 deg/s the ball laps every 0.6 s, and a
+    predictive unwrap that misses one lap is wrong by 360 degrees for the rest
+    of the window. The circular fit never unwraps, so it cannot."""
+    from prophetvision.earlyside import fit_speed_circular
+    d = WheelDecay(c0=17.5, c2=2.0e-4)
+    true_w, phi = 615.0, 210.0
+    t = np.concatenate([np.arange(0.0, 0.35, 0.02),      # gaps wide enough to
+                        np.arange(1.10, 1.45, 0.02),     # hide whole laps
+                        np.arange(2.20, 2.60, 0.02)])
+    az = (phi + d.travel(true_w, t)) % 360.0
+    rng = np.random.default_rng(0)
+    az = (az + rng.normal(0, 2.0, len(t))) % 360.0
+    r, w0, ph = fit_speed_circular(t, az, d)
+    assert abs(w0 - true_w) < 8.0, w0
+    assert abs((ph - phi + 180) % 360 - 180) < 8.0
+    assert r > 0.9
+
+
+def test_circular_fit_reports_a_low_score_on_noise():
+    """The score has to be readable as a confidence, or a failed fit is
+    indistinguishable from a good one — which is exactly how the unwrapped fit
+    passed unnoticed with 231 degrees of residual."""
+    from prophetvision.earlyside import fit_speed_circular
+    d = WheelDecay(c0=17.5, c2=2.0e-4)
+    rng = np.random.default_rng(1)
+    t = np.sort(rng.uniform(0, 2.0, 60))
+    az = rng.uniform(0, 360, 60)
+    r, _w0, _ph = fit_speed_circular(t, az, d)
+    assert r < 0.45
+    good_t = np.arange(0.0, 2.0, 0.03)
+    good_az = (100.0 + d.travel(615.0, good_t)) % 360.0
+    assert fit_speed_circular(good_t, good_az, d)[0] > 0.95
+
+
 def test_integrate_to_is_monotone_in_travel():
     from prophetvision.earlyside import _integrate_to
     d = WheelDecay(c0=17.5, c2=2.0e-4)

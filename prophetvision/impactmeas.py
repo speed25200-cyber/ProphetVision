@@ -319,6 +319,48 @@ def speed_at_radius(detections, rotor_rate_pockets_s: float,
     return float(v[k]), float(track[k, 0]), float(track[k, 4]) % 37.0
 
 
+def transfer_point(detections, rotor_rate_pockets_s, decay,
+                   w_target: float = 93.6, r_rim: float = 0.78,
+                   **kwargs) -> tuple[float, float] | None:
+    """Time and rotor-frame index where the ball's speed crosses ``w_target``.
+
+    This is the point the side-view prediction aims at, so it has to be
+    measured well: near the transfer the deceleration is only ~20 deg/s^2, and
+    the ball and rotor close on each other at ~18 pockets/s, so a few deg/s of
+    slope error moves the crossing a quarter of a second and the index four
+    pockets. Reading it off a local slope cost about that much. The terminal
+    arc is dense and contiguous, so instead the decay law — one free parameter,
+    the coefficients being properties of the wheel — is fitted to the whole of
+    it and the crossing solved for in closed form.
+
+    Returns ``(t, index)``, or None if the arc never brackets that speed.
+    """
+    from .earlyside import fit_speed
+
+    res = measure_impact(detections, rotor_rate_pockets_s, r_rim=r_rim,
+                         **kwargs)
+    if res is None:
+        return None
+    d = np.asarray(detections, dtype=float)
+    track = None
+    for a in link_tracks(d[d[:, 2] >= r_rim]):
+        if a[0, 0] <= res.t <= a[-1, 0]:
+            track = a[a[:, 0] <= res.t]
+    if track is None or len(track) < 6:
+        return None
+    t = track[:, 0]
+    az = np.degrees(np.unwrap(np.radians(track[:, 1])))
+    w0 = fit_speed(t, az, decay, omega_grid=np.arange(60.0, 220.0, 0.25))[1]
+    t_x = float(t[0] + decay.time_to(w0, w_target))
+    if not (t[0] - 0.60 <= t_x <= t[-1] + 0.30):
+        return None
+    idx = _unwrap_index(track[:, 4])
+    slope = (idx[1] - idx[0]) / (t[1] - t[0])
+    index = (float(np.interp(t_x, t, idx,
+                             left=idx[0] + (t_x - t[0]) * slope)) % 37.0)
+    return t_x, index
+
+
 def bounce_spread(impacts, results, wheel=None) -> dict:
     """Anchor-free dispersion of the bounce, in pockets.
 
