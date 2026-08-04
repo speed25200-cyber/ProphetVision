@@ -309,6 +309,115 @@ def fit_speed_circular(t, azimuth_deg, decay: WheelDecay,
 
 
 @dataclass
+class SpeedEstimate:
+    """A fitted speed together with the evidence for trusting it."""
+
+    omega0: float
+    concentration: float
+    coarse: float                # from frame-to-frame steps, no lap ambiguity
+    gate: tuple[float, float]
+    n_steps: int
+
+    @property
+    def at_gate_edge(self) -> bool:
+        lo, hi = self.gate
+        span = hi - lo
+        return (self.omega0 - lo) < 0.03 * span or (hi - self.omega0) < 0.03 * span
+
+    def trustworthy(self, min_concentration: float = 0.90,
+                    min_steps: int = 8) -> bool:
+        """Whether this speed should be predicted from at all.
+
+        Both tests catch a real failure seen on the reference footage. A low
+        concentration means no single trajectory explains the detections — spin
+        5 scores 0.44 and its speed is out by 16%. An optimum sitting on the
+        edge of the gate means the two estimators disagree: the vote wanted to
+        keep going and the step estimate would not let it, which is spin 1, out
+        by 22%. The three rounds that pass both are the three that are accurate
+        to better than 6%.
+        """
+        return (self.concentration >= min_concentration
+                and self.n_steps >= min_steps
+                and not self.at_gate_edge)
+
+
+def coarse_speed_from_steps(t, azimuth_deg, min_step_deg: float = 3.0,
+                            max_dt: float = 0.045, window: int = 16,
+                            search=(-1500.0, -100.0), bins: int = 70):
+    """Speed from frame-to-frame azimuth steps — no lap ambiguity, no fit.
+
+    The circular vote is not identifiable on its own: over a window of T
+    seconds, speeds differing by roughly 360/T produce the same wrapped phase,
+    so the vote has a comb of peaks and its global maximum is systematically
+    the wrong tooth (measured on the reference footage: every round biased low,
+    and on one of them the correct answer was the *third* peak). Detections one
+    or two frames apart are only ~10 degrees apart, which fixes the speed with
+    no ambiguity at all — coarsely, but well enough to say which tooth.
+
+    Steps smaller than ``min_step_deg`` are dropped: those are the static
+    clutter, and a plain median over all pairs lands on them instead of on the
+    ball.
+
+    Returns ``(speed_deg_s, t_centre, n_pairs)``; speed is signed.
+    """
+    t = np.asarray(t, dtype=float)
+    az = np.asarray(azimuth_deg, dtype=float)
+    order = np.argsort(t)
+    t, az = t[order], az[order]
+    vel, mid = [], []
+    for j in range(len(t)):
+        for k in range(j + 1, min(j + window, len(t))):
+            dt = t[k] - t[j]
+            if dt < 1e-4 or dt > max_dt:
+                continue
+            step = (az[k] - az[j] + 180.0) % 360.0 - 180.0
+            if abs(step) < min_step_deg:
+                continue
+            vel.append(step / dt)
+            mid.append(0.5 * (t[j] + t[k]))
+    if len(vel) < 4:
+        return float("nan"), float("nan"), 0
+    vel, mid = np.array(vel), np.array(mid)
+    hist, edges = np.histogram(vel, bins=bins, range=search)
+    k = int(np.argmax(hist))
+    mode = 0.5 * (edges[k] + edges[k + 1])
+    keep = np.abs(vel - mode) < (search[1] - search[0]) / bins * 5.0
+    if keep.sum() < 4:
+        return float("nan"), float("nan"), 0
+    return (float(np.median(vel[keep])), float(np.median(mid[keep])),
+            int(keep.sum()))
+
+
+def fit_speed_gated(t, azimuth_deg, decay: WheelDecay, weights=None,
+                    tol: float = 0.22, step: float = 0.5) -> SpeedEstimate:
+    """Coarse speed from frame steps, then the circular vote inside that gate.
+
+    This is the estimator to use. The vote alone picks the wrong tooth of its
+    own alias comb; the step estimate alone is too coarse to extrapolate ten
+    seconds. Gating one with the other uses each for what it is good at, and
+    the two disagreeing is itself the signal that the round is not predictable
+    — see :meth:`SpeedEstimate.trustworthy`.
+    """
+    t = np.asarray(t, dtype=float)
+    az = np.asarray(azimuth_deg, dtype=float)
+    v, t_mid, n = coarse_speed_from_steps(t, az)
+    if not np.isfinite(v) or n == 0:
+        r, w0, _p = fit_speed_circular(t, az, decay, weights=weights)
+        return SpeedEstimate(omega0=w0, concentration=r, coarse=float("nan"),
+                             gate=(float("nan"), float("nan")), n_steps=0)
+    # carry the coarse speed back to the start of the window before gating
+    w_start = decay.speed_after(abs(v), -(t_mid - t[0])) if t_mid > t[0] else abs(v)
+    s = math.sqrt(decay.c2 / decay.c0)
+    k = math.sqrt(decay.c0 * decay.c2)
+    w_start = math.tan(math.atan(abs(v) * s) + k * (t_mid - t[0])) / s
+    lo, hi = w_start * (1.0 - tol), w_start * (1.0 + tol)
+    r, w0, _p = fit_speed_circular(t, az, decay, weights=weights,
+                                   omega_grid=np.arange(lo, hi, step))
+    return SpeedEstimate(omega0=w0, concentration=r, coarse=w_start,
+                         gate=(lo, hi), n_steps=n)
+
+
+@dataclass
 class TransferCalibration:
     """Speed at the cutoff -> time remaining until the transfer, per wheel.
 

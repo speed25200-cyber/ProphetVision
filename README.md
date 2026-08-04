@@ -19,30 +19,39 @@ Mesuré sur la vidéo de référence, prédiction émise **2 s avant l'animation
 multiplicateurs**, depuis la **vue latérale seule** :
 
 Tous les chiffres sont en **validation croisée leave-one-out** : la
-calibration de chaque tour est ajustée sur les quatre autres. Avec cinq tours,
-c'est le seul type de chiffre publiable.
+calibration de chaque tour est ajustée sur les autres. Avec cinq tours, c'est
+le seul type de chiffre publiable.
 
-| Mise | Couverture | Au hasard | Avantage réel |
-|---|---|---|---|
-| 13 jetons | 39,8 % | 35,1 % | +4,7 |
-| 18 jetons | 53,9 % | 48,6 % | +5,2 |
-| **21 jetons** | **61,8 %** | 56,8 % | **+5,1** |
-| 24 jetons | 69,5 % | 64,9 % | +4,6 |
+**Le système sait maintenant quand il ne sait pas.** L'ajustement de vitesse
+renvoie une concentration ; elle sort **bimodale** sur les cinq tours —
+0,44 / 0,98 / 0,98 / 0,97 / 0,44 — et elle prédit l'exactitude : les trois
+tours à forte concentration retrouvent la vitesse à **moins de 6 %**, les deux
+autres se trompent de **15 % et 23 %**. Le système prédit les trois premiers et
+**s'abstient** sur les deux autres.
 
-**Un taux ≥ 60 % est atteint à partir de 21 jetons (61,8 %).** Mais lisez la
-colonne de droite : **l'avantage réel sur le hasard est de ~5 points**, quelle
-que soit la mise. Élargir la zone monte le taux affiché *et* le plancher. Les
-5 points, eux, ne bougent pas — c'est toute l'information que le système
-extrait aujourd'hui.
+| | prédit tous les tours | **s'abstient quand il doute** |
+|---|---|---|
+| Tours prédits | 5 / 5 | **3 / 5** |
+| rms sur l'instant | 0,624 s | **0,376 s** |
+| σ total | 13,18 poches | **8,70 poches** |
+| **18 jetons** | 53,9 % | **70,0 %** |
+| Plancher (hasard) | 48,6 % | 48,6 % |
+| **Avantage réel** | **+5,2** | **+21,4** |
 
-⚠️ **Deux chiffres antérieurs de ce README ont été retirés** (69,6 % puis
-51,2 %) : le premier reposait sur **un seul tour** pour le terme de prédiction,
-le second n'avait pas de calibration de roue. Les cinq tours sont maintenant
-prédits, en LOO. Détail dans « Ce que le passage à cinq tours a changé ».
+Sur les tours qu'il accepte, **18 jetons couvrent 70,0 % contre 48,6 % au
+hasard — 21 points d'avantage**, contre 5 points quand on le force à tout
+prédire. C'est le bon mode d'emploi : à la roulette on peut passer son tour.
 
-Le terme aval tient : **avec un instant de transfert exact, 18 jetons
-couvriraient 74 %**. Ce n'est pas le rebond qui bloque, c'est la précision sur
-l'instant — 0,62 s rms là où il en faudrait 0,48.
+⚠️ **Trois tours.** C'est une hypothèse à vérifier sur d'autres
+enregistrements, pas un taux démontré : le test de Rayleigh donne p = 0,29, et
+le critère d'abstention a été conçu sur ces cinq tours (sa seule défense est
+que la séparation est franche — n'importe quel seuil entre 0,5 et 0,95 fait la
+même coupe). Le taux d'abstention est de 40 %.
+
+⚠️ **Chiffres antérieurs retirés** : 69,6 % (prédiction mesurée sur **un seul**
+tour), 51,2 % (déroulé d'angle cassé), 53,9 %/61,8 % (sans abstention — toujours
+valables si l'on veut jouer tous les tours). Détail dans « Ce que le passage à
+cinq tours a changé ».
 
 ## Architecture
 
@@ -354,6 +363,38 @@ La fenêtre exploitable ne dure qu'environ une seconde (les détections se
 concentrent dans les 0,5 s avant la coupure), ce qui limite la courbure
 mesurable et donc la qualité de l'extrapolation sur 10-14 s. C'est là qu'il
 faut travailler, et il faut plus de tours pour calibrer mieux.
+
+### Le défaut qui restait : le vote aliasait
+
+Le vote circulaire n'est **pas identifiable seul**. Sur une fenêtre de T
+secondes, deux vitesses séparées d'environ 360/T produisent la même phase
+enroulée : le vote a donc un peigne de pics, et son maximum global n'est pas
+toujours le bon. Mesuré sur les cinq tours : **tous les gagnants sont biaisés
+vers le bas**, et sur le tour 1 la bonne réponse était au **troisième** pic
+(−2,0 % contre −19,0 % pour le maximum).
+
+Le correctif utilise une information que le vote ignorait : deux détections
+séparées d'une image ne sont distantes que d'une dizaine de degrés, ce qui fixe
+la vitesse **sans aucune ambiguïté de tour**. `coarse_speed_from_steps` en tire
+une estimation grossière (en écartant les pas < 3° — sinon la médiane tombe sur
+le fouillis statique, qui est majoritaire), et `fit_speed_gated` restreint le
+vote à ±22 % autour d'elle. Chacun sert à ce qu'il sait faire : les pas disent
+*quelle dent* du peigne, le vote dit *où exactement* sur cette dent.
+
+Et leur désaccord est le signal d'abstention : un optimum collé au bord de la
+fenêtre, ou une concentration effondrée, signalent un tour non prédictible —
+sans jamais regarder le résultat.
+
+| tour | concentration | verdict | erreur de vitesse |
+|---|---|---|---|
+| 1 | 0,44 | **abstention** | −23,4 % |
+| A | 0,98 | prédit | −5,1 % |
+| B | 0,98 | prédit | −5,7 % |
+| 4 | 0,97 | prédit | +0,9 % |
+| 5 | 0,44 | **abstention** | −15,5 % |
+
+Erreurs LOO sur les trois tours acceptés : **−0,18 / −0,35 / +0,52 s**,
+rms **0,376 s**.
 
 ### Combien de tours contient la vidéo
 

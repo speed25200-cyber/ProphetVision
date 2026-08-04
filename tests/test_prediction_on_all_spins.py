@@ -134,3 +134,72 @@ def test_the_circular_fit_beats_the_unwrapped_one_on_real_data(rounds):
     rms_c = float(np.sqrt((_loo_errors(w_circ, rem) ** 2).mean()))
     rms_u = float(np.sqrt((_loo_errors(w_unwr, rem) ** 2).mean()))
     assert rms_c < rms_u
+
+
+# --- confidence gating: the system declines the rounds it cannot fit --------
+
+@pytest.fixture(scope="module")
+def gated(rounds):
+    from prophetvision.earlyside import fit_speed_gated
+    out = {}
+    for n, (rows, cutoff, meas) in rounds.items():
+        est = fit_speed_gated(rows[:, 0], rows[:, 1], DECAY, weights=rows[:, 3])
+        w = DECAY.speed_after(est.omega0, cutoff - rows[0, 0])
+        out[n] = (est, w, meas - cutoff)
+    return out
+
+
+def test_the_confidence_split_is_bimodal_not_a_tuned_threshold(gated):
+    """Concentrations come out 0.44, 0.98, 0.98, 0.97, 0.44 — two clusters with
+    nothing between them. Any threshold from 0.5 to 0.95 makes the same cut,
+    which is what stops this being a knob fitted to the answer."""
+    r = sorted(est.concentration for est, _w, _rem in gated.values())
+    assert r[1] < 0.60 < 0.90 < r[2]
+    accepted = [n for n, (est, _w, _rem) in gated.items() if est.trustworthy()]
+    assert set(accepted) == {"spinA", "spinB", "spin4"}
+
+
+def test_the_rounds_it_declines_are_the_ones_it_would_get_wrong(gated):
+    """The gate has to correlate with accuracy or it is worthless. Accepted
+    rounds land within 6% of the speed the outcome requires; declined ones are
+    out by 15% and 23%."""
+    need = {n: _needed_speed(rem) for n, (_e, _w, rem) in gated.items()}
+    for n, (est, w, _rem) in gated.items():
+        err = abs(w / need[n] - 1.0)
+        assert (err < 0.07) == est.trustworthy(), (n, err)
+
+
+def _needed_speed(remaining):
+    import math
+    s = math.sqrt(DECAY.c2 / DECAY.c0)
+    k = math.sqrt(DECAY.c0 * DECAY.c2)
+    return math.tan(math.atan(OMEGA_TRANSFER_DEG_S * s) + k * remaining) / s
+
+
+def test_coverage_on_the_rounds_it_accepts(gated):
+    """The headline of the gated pipeline: on the three rounds it will predict,
+    18 chips cover 70% against a 48.6% floor — an edge of 21 points, against
+    the 5 points the ungated pipeline gets by predicting everything.
+
+    Three rounds. This is a hypothesis to test on more footage, not a
+    demonstrated win rate, and the README says so."""
+    acc = [n for n, (est, _w, _rem) in gated.items() if est.trustworthy()]
+    w = np.array([gated[n][1] for n in acc])
+    rem = np.array([gated[n][2] for n in acc])
+    rms = float(np.sqrt((_loo_errors(w, rem) ** 2).mean()))
+    assert rms == pytest.approx(0.376, abs=0.02)
+    sigma = float(np.hypot(rms * RELATIVE_RATE, 5.32))
+    assert sigma == pytest.approx(8.70, abs=0.15)
+    assert wrapped_normal_coverage(sigma, 18) == pytest.approx(0.700, abs=0.01)
+    assert wrapped_normal_coverage(sigma, 18) - 18 / 37 > 0.20
+
+
+def test_gating_more_than_halves_the_prediction_error(gated):
+    acc = [n for n, (est, _w, _rem) in gated.items() if est.trustworthy()]
+    w_all = np.array([gated[n][1] for n in gated])
+    rem_all = np.array([gated[n][2] for n in gated])
+    w_acc = np.array([gated[n][1] for n in acc])
+    rem_acc = np.array([gated[n][2] for n in acc])
+    rms_all = float(np.sqrt((_loo_errors(w_all, rem_all) ** 2).mean()))
+    rms_acc = float(np.sqrt((_loo_errors(w_acc, rem_acc) ** 2).mean()))
+    assert rms_acc < rms_all / 2.0

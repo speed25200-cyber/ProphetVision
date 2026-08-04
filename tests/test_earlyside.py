@@ -192,3 +192,63 @@ def test_an_uncalibrated_scale_is_the_identity():
     cal = TransferCalibration(decay=d)
     assert cal.remaining(500.0) == pytest.approx(
         d.time_to(500.0, OMEGA_TRANSFER_DEG_S))
+
+
+def test_coarse_speed_ignores_the_static_clutter():
+    """A plain median over frame-to-frame steps lands on the clutter, not the
+    ball: on the reference footage the still detections outnumber the moving
+    ones and drag the estimate to nearly zero."""
+    from prophetvision.earlyside import coarse_speed_from_steps
+    t = np.repeat(np.arange(0.0, 1.0, 0.02), 2)
+    ball = (300.0 - 480.0 * t) % 360.0
+    still = np.full(len(t), 47.0)
+    az = np.where(np.arange(len(t)) % 2 == 0, ball, still)
+    v, _mid, n = coarse_speed_from_steps(t, az)
+    assert n >= 8
+    assert v == pytest.approx(-480.0, rel=0.05)
+
+
+def test_coarse_speed_has_no_lap_ambiguity():
+    """The whole point: consecutive frames are ~10 degrees apart, so the speed
+    is fixed outright, where the wrapped-phase vote only fixes it modulo a comb
+    of aliases."""
+    from prophetvision.earlyside import coarse_speed_from_steps
+    t = np.arange(0.0, 0.8, 0.02)
+    for true_v in (-320.0, -480.0, -700.0, -900.0):
+        az = (120.0 + true_v * t) % 360.0
+        v, _m, _n = coarse_speed_from_steps(t, az)
+        assert v == pytest.approx(true_v, rel=0.06), true_v
+
+
+def test_gated_fit_picks_the_right_tooth_of_the_alias_comb():
+    """Measured on the reference footage: the ungated vote's global maximum was
+    the wrong peak on two rounds out of five, once by 19%, with the correct
+    answer sitting at the third peak. Gating on the step estimate fixes it."""
+    from prophetvision.earlyside import fit_speed_circular, fit_speed_gated
+    d = WheelDecay(c0=17.5, c2=2.0e-4)
+    true_w = 760.0
+    t = np.arange(0.0, 1.1, 0.02)
+    az = (55.0 + d.travel(true_w, t)) % 360.0
+    rng = np.random.default_rng(4)
+    az = (az + rng.normal(0, 3.0, len(t))) % 360.0
+    est = fit_speed_gated(t, az, d)
+    assert est.omega0 == pytest.approx(true_w, rel=0.05), est.omega0
+    assert est.trustworthy()
+    assert not est.at_gate_edge
+    assert est.gate[0] < est.omega0 < est.gate[1]
+
+
+def test_a_speed_estimate_knows_when_it_is_unreliable():
+    from prophetvision.earlyside import SpeedEstimate, fit_speed_gated
+    d = WheelDecay(c0=17.5, c2=2.0e-4)
+    rng = np.random.default_rng(11)
+    t = np.sort(rng.uniform(0, 1.2, 90))
+    est = fit_speed_gated(t, rng.uniform(0, 360, 90), d)
+    assert not est.trustworthy()
+    ok = SpeedEstimate(omega0=700.0, concentration=0.97, coarse=690.0,
+                       gate=(560.0, 860.0), n_steps=20)
+    assert ok.trustworthy()
+    assert not SpeedEstimate(**{**ok.__dict__, "concentration": 0.5}).trustworthy()
+    assert not SpeedEstimate(**{**ok.__dict__, "n_steps": 3}).trustworthy()
+    edge = SpeedEstimate(**{**ok.__dict__, "omega0": 858.0})
+    assert edge.at_gate_edge and not edge.trustworthy()

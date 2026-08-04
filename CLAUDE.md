@@ -109,6 +109,35 @@ Fixtures : `tests/data/spins_rim.npz` (rebord, 5 tours) et
 - **51,2 %** : déroulé d'angle cassé, aucune calibration de roue.
 - **σ = 4,4 poches** : non reproductible avec le code du dépôt.
 
+## AMÉLIORATION (2026-08-04, v3) — abstention : 70 % sur 18 jetons
+
+**Le vote circulaire aliasait.** Sur une fenêtre de T secondes, deux vitesses
+séparées de ~360/T donnent la même phase enroulée → peigne de pics, et le
+maximum global n'est pas toujours le bon (tour 1 : bonne réponse au **3e** pic,
+−2,0 % contre −19,0 %). Tous les gagnants étaient biaisés vers le bas.
+
+Correctif en deux temps (`fit_speed_gated`) :
+1. `coarse_speed_from_steps` — les pas image-à-image (~10°) fixent la vitesse
+   **sans ambiguïté de tour**. Écarter les pas < 3°, sinon la médiane tombe sur
+   le fouillis statique (majoritaire).
+2. Le vote circulaire restreint à ±22 % autour de cette estimation.
+
+**Et leur désaccord donne l'abstention.** La concentration sort **bimodale** :
+0,44 / 0,98 / 0,98 / 0,97 / 0,44. Elle prédit l'exactitude — les trois tours à
+forte concentration retrouvent la vitesse à < 6 %, les deux autres à 15 et 23 %.
+N'importe quel seuil entre 0,5 et 0,95 fait la même coupe (pas un knob ajusté).
+
+| | tout prédire | **avec abstention** |
+|---|---|---|
+| tours prédits | 5/5 | **3/5** |
+| rms instant | 0,624 s | **0,376 s** |
+| σ total | 13,18 | **8,70** |
+| **18 jetons** | 53,9 % | **70,0 %** |
+| avantage | +5,2 | **+21,4** |
+
+⚠️ **n = 3**, Rayleigh p = 0,29, critère conçu sur ces cinq tours, abstention
+40 %. Hypothèse à vérifier sur d'autres enregistrements, pas un taux démontré.
+
 ## Acquis qui tiennent toujours
 
 - **Vitesse de transfert** `earlyside.OMEGA_TRANSFER_DEG_S = 93,6 °/s` au
