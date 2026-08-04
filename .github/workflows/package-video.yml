@@ -25,6 +25,11 @@ jobs:
           ffprobe -v error -select_streams v:0 \
             -show_entries stream=width,height,r_frame_rate,avg_frame_rate,nb_frames,duration,codec_name \
             -of default=noprint_wrappers=1 original.mov | tee probe.txt
+          # The recording starts mid-round: at t=0 the top-down view is already
+          # up with the ball on the rim, so 0-26 s holds a sixth spin whose
+          # result is shown a few seconds in.
+          ffmpeg -y -ss 0 -to 26 -i original.mov -c:v libx264 \
+            -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an hq_000_026.mp4
           # Full-resolution windows: rounds A/B and the final spin C.
           ffmpeg -y -ss 60 -to 100 -i original.mov -c:v libx264 \
             -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an hq_060_100.mp4
