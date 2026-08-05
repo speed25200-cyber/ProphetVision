@@ -1,0 +1,112 @@
+name: slice-video
+# Cuts ANY release video into consecutive full-quality windows and pushes them
+# to a branch, so a newly uploaded recording is usable without knowing yet
+# where its rounds are.
+#
+# Usage: Actions -> slice-video -> Run workflow, then set `tag` to the release
+# you uploaded (e.g. Video-v2). Everything else has a sensible default.
+#
+# CRF 14 and no downscale are not negotiable: the ball is a few pixels across
+# and moving several hundred degrees a second, and it is the first thing a
+# lossy encode throws away.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag holding the video (e.g. Video-v2)'
+        required: true
+        default: 'Video-v2'
+      pattern:
+        description: 'Asset filename pattern'
+        required: false
+        default: '*.mov'
+      window:
+        description: 'Seconds per slice'
+        required: false
+        default: '30'
+      start:
+        description: 'Start time in seconds'
+        required: false
+        default: '0'
+      end:
+        description: 'End time in seconds (blank = to the end)'
+        required: false
+        default: ''
+      branch:
+        description: 'Branch to push the slices to (blank = video-<tag>)'
+        required: false
+        default: ''
+
+jobs:
+  slice:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download "${{ inputs.tag }}" --pattern "${{ inputs.pattern }}" \
+            --output original.mov --repo "$GITHUB_REPOSITORY"
+          ls -la original.mov
+
+      - name: Probe and slice
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          ffprobe -v error -select_streams v:0 \
+            -show_entries stream=width,height,r_frame_rate,avg_frame_rate,nb_frames,codec_name \
+            -show_entries format=duration \
+            -of default=noprint_wrappers=1 original.mov | tee probe.txt
+
+          DUR=$(ffprobe -v error -show_entries format=duration \
+                -of default=noprint_wrappers=1:nokey=1 original.mov)
+          WIN=${{ inputs.window }}
+          BEG=${{ inputs.start }}
+          END="${{ inputs.end }}"
+          if [ -z "$END" ]; then END=$DUR; fi
+          echo "duration=$DUR slicing $BEG..$END in ${WIN}s windows"
+
+          python3 - "$BEG" "$END" "$WIN" > slices.txt <<'PY'
+          import sys
+          beg, end, win = float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
+          t = beg
+          while t < end:
+              hi = min(t + win, end)
+              print(f"{t:.2f} {hi:.2f} hq_{int(t):04d}_{int(hi):04d}.mp4")
+              t = hi
+          PY
+          cat slices.txt
+
+          while read -r a b name; do
+            ffmpeg -y -ss "$a" -to "$b" -i original.mov -c:v libx264 \
+              -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an "$name"
+          done < slices.txt
+          ls -la hq_*.mp4
+
+      - name: Split into <95 MB parts and push
+        run: |
+          set -euo pipefail
+          BRANCH="${{ inputs.branch }}"
+          if [ -z "$BRANCH" ]; then BRANCH="video-${{ inputs.tag }}"; fi
+          mkdir -p chunks
+          cp probe.txt slices.txt chunks/
+          for f in hq_*.mp4; do
+            # GitHub rejects blobs over 100 MB, so anything larger is split and
+            # reassembled with `cat` on the other side.
+            split -b 95m -d "$f" "chunks/$f.part."
+          done
+          sha256sum hq_*.mp4 chunks/* > chunks/SHA256SUMS || true
+          du -sh chunks
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan "$BRANCH"
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          git add -f chunks
+          git commit -m "full-quality slices from release ${{ inputs.tag }}"
+          git push -f origin "$BRANCH"
+          echo "pushed to $BRANCH"
