@@ -18,40 +18,61 @@ distribution circulaire d'écart de poches, apprise spin après spin.
 Mesuré sur la vidéo de référence, prédiction émise **2 s avant l'animation des
 multiplicateurs**, depuis la **vue latérale seule** :
 
-Tous les chiffres sont en **validation croisée leave-one-out** : la
-calibration de chaque tour est ajustée sur les autres. Avec cinq tours, c'est
-le seul type de chiffre publiable.
+### ⚠️ Test hors échantillon sur une deuxième vidéo — lisez ceci en premier
 
-**Le système sait maintenant quand il ne sait pas.** L'ajustement de vitesse
-renvoie une concentration ; elle sort **bimodale** sur les cinq tours —
-0,44 / 0,98 / 0,98 / 0,97 / 0,44 — et elle prédit l'exactitude : les trois
-tours à forte concentration retrouvent la vitesse à **moins de 6 %**, les deux
-autres se trompent de **15 % et 23 %**. Le système prédit les trois premiers et
-**s'abstient** sur les deux autres.
+Une seconde vidéo (271 s, 6 tours, tag `Video-v2`) a été prédite avec la
+calibration **figée** sur la première : échelle 1,0584, ω_transfert 93,6 °/s,
+ellipse latérale, seuil d'abstention. Rien n'a été réajusté.
 
-| | prédit tous les tours | **s'abstient quand il doute** |
+| | vidéo 1 (calibration) | **vidéo 2 (aveugle)** | **les deux** |
+|---|---|---|---|
+| tours mesurables | 5 / 5 | **4 / 6** | 9 / 11 |
+| tours retenus | 3 (abstention) | 4 (aucune abstention) | 7 |
+| σ bout-en-bout | 12,66 poches | **5,44 poches** | **8,47 poches** |
+| **18 jetons** | 55,0 % | 90,2 % | **71,3 %** |
+| plancher | 48,6 % | 48,6 % | 48,6 % |
+| Rayleigh p | 0,98 | 0,19 | **0,43** |
+
+**Sur les 7 tours poolés : 71,3 % à 18 jetons contre 48,6 % au hasard, soit
++22,7 points.** Mais **p = 0,43** : sept tours ne suffisent pas à distinguer ce
+résultat du hasard. C'est un ordre de grandeur encourageant, pas une preuve.
+
+Trois choses que la vidéo 2 a apprises, toutes défavorables au discours
+précédent :
+
+1. **Deux tours sur six ne sont pas mesurables du tout.** La vue plongeante y
+   arrive après que la bille soit déjà descendue : il n'y a aucun arc sur
+   lequel ancrer la référence. Ce n'est pas un échec de prédiction, c'est un
+   défaut de couverture.
+2. **Le critère d'abstention n'a rien filtré** : les quatre tours mesurables
+   ont tous une concentration > 0,97. Sa capacité de tri — le point le plus
+   faible du résultat de la vidéo 1 — reste **non testée**, pas confirmée.
+3. **Le budget en quadrature était optimiste.** Mesurée bout-en-bout, la vidéo
+   1 donne σ = 12,66 poches là où σ_prédiction ⊕ σ_dispersion annonçait 7,88.
+   Les chiffres ci-dessus sont tous des mesures bout-en-bout, seules honnêtes.
+
+Un défaut réel du pipeline a été trouvé grâce à la vidéo 2 et corrigé pour les
+deux : `transfer_point` ne lisait la vitesse que sur la piste descendante
+finale, alors que les trous de détection coupent souvent la course en plusieurs
+pistes et que le franchissement peut tomber dans un trou (tour 116,50 s : bille
+suivie à 118 °/s, perdue une seconde, reprise à 84 °/s). Chaque piste fournit
+maintenant un point (temps, vitesse) et la loi est ajustée à travers eux.
+
+Les six tours de la vidéo 2 sont figés dans `tests/data/video2_rounds.npz` ;
+`tests/test_video2_out_of_sample.py` re-dérive ces chiffres sans la vidéo.
+
+### Chiffres sur la vidéo 1 seule (calibration)
+
+Validation croisée leave-one-out, cinq tours :
+
+| Mise | tous les tours | avec abstention (n=3) |
 |---|---|---|
-| Tours prédits | 5 / 5 | **3 / 5** |
-| rms sur l'instant | 0,624 s | **0,376 s** |
-| σ total | 13,18 poches | **8,70 poches** |
-| **18 jetons** | 53,9 % | **70,0 %** |
-| Plancher (hasard) | 48,6 % | 48,6 % |
-| **Avantage réel** | **+5,2** | **+21,4** |
+| 18 jetons | 56,4 % | 74,7 % |
+| plancher | 48,6 % | 48,6 % |
 
-Sur les tours qu'il accepte, **18 jetons couvrent 70,0 % contre 48,6 % au
-hasard — 21 points d'avantage**, contre 5 points quand on le force à tout
-prédire. C'est le bon mode d'emploi : à la roulette on peut passer son tour.
-
-⚠️ **Trois tours.** C'est une hypothèse à vérifier sur d'autres
-enregistrements, pas un taux démontré : le test de Rayleigh donne p = 0,29, et
-le critère d'abstention a été conçu sur ces cinq tours (sa seule défense est
-que la séparation est franche — n'importe quel seuil entre 0,5 et 0,95 fait la
-même coupe). Le taux d'abstention est de 40 %.
-
-⚠️ **Chiffres antérieurs retirés** : 69,6 % (prédiction mesurée sur **un seul**
-tour), 51,2 % (déroulé d'angle cassé), 53,9 %/61,8 % (sans abstention — toujours
-valables si l'on veut jouer tous les tours). Détail dans « Ce que le passage à
-cinq tours a changé ».
+⚠️ Ces deux colonnes utilisent le budget en quadrature (σ_prédiction ⊕
+σ_dispersion). Le tableau hors échantillon plus haut montre qu'il **sous-estime**
+l'erreur réelle : mesurée bout-en-bout, la vidéo 1 donne 55,0 % et non 74,7 %.
 
 ## Architecture
 

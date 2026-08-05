@@ -333,32 +333,56 @@ def transfer_point(detections, rotor_rate_pockets_s, decay,
     the coefficients being properties of the wheel — is fitted to the whole of
     it and the crossing solved for in closed form.
 
-    Returns ``(t, index)``, or None if the arc never brackets that speed.
-    """
-    from .earlyside import fit_speed
+    The rim travel is often broken into several tracks by detection gaps, and
+    the crossing can fall inside one of those gaps: on one round the ball was
+    tracked at 118 deg/s, lost for a second, and picked up again at 84, with
+    the 93.6 crossing in between and no single track containing it. So the
+    speed is not read off one track. Every ball-like track contributes one
+    (time, speed) point, the decay law is fitted through those points, and the
+    crossing is solved from the fit -- which also averages the per-track noise
+    instead of trusting whichever track happened to be longest.
 
+    Returns ``(t, index)``, or None if the ball's speeds never bracket
+    ``w_target``.
+    """
+    d = np.asarray(detections, dtype=float)
     res = measure_impact(detections, rotor_rate_pockets_s, r_rim=r_rim,
                          **kwargs)
     if res is None:
         return None
-    d = np.asarray(detections, dtype=float)
-    track = None
-    for a in link_tracks(d[d[:, 2] >= r_rim]):
-        if a[0, 0] <= res.t <= a[-1, 0]:
-            track = a[a[:, 0] <= res.t]
-    if track is None or len(track) < 6:
+    rim = d[d[:, 2] >= r_rim]
+    pts = []
+    for a in link_tracks(rim):
+        if len(a) < 6 or a[0, 0] > res.t + 0.05:
+            continue
+        if a[-1, 0] - a[0, 0] <= 0.05:
+            continue
+        az = np.degrees(np.unwrap(np.radians(a[:, 1])))
+        v = float(np.polyfit(a[:, 0] - a[0, 0], az, 1)[0])
+        if v * rotor_rate_pockets_s >= 0.0 or abs(v) < 3.0 * POCKET_DEG:
+            continue                      # static clutter, or co-rotating
+        pts.append((float(np.mean(a[:, 0])), abs(v)))
+    if not pts:
         return None
-    t = track[:, 0]
-    az = np.degrees(np.unwrap(np.radians(track[:, 1])))
-    w0 = fit_speed(t, az, decay, omega_grid=np.arange(60.0, 220.0, 0.25))[1]
-    t_x = float(t[0] + decay.time_to(w0, w_target))
-    if not (t[0] - 0.60 <= t_x <= t[-1] + 0.30):
+    pts.sort()
+    t_mid = np.array([p[0] for p in pts])
+    w_obs = np.array([p[1] for p in pts])
+    # One free parameter: the speed at the first point. The decay law supplies
+    # the shape, so two points suffice and more only tighten it. The grid
+    # reaches below the target on purpose: a round whose only usable track
+    # averages just under it is still measurable by extrapolating backwards a
+    # fraction of a second, and refusing that threw away a good spin.
+    grid = np.arange(60.0, 420.0, 0.5)
+    cost = [float(np.sum([(decay.speed_after(g, tt - t_mid[0]) - w) ** 2
+                          for tt, w in zip(t_mid, w_obs)])) for g in grid]
+    w_start = float(grid[int(np.argmin(cost))])
+    t_x = float(t_mid[0] + decay.time_to(w_start, w_target))
+    if not (rim[:, 0].min() - 1.5 <= t_x <= res.t + 0.5):
         return None
-    idx = _unwrap_index(track[:, 4])
-    slope = (idx[1] - idx[0]) / (t[1] - t[0])
-    index = (float(np.interp(t_x, t, idx,
-                             left=idx[0] + (t_x - t[0]) * slope)) % 37.0)
-    return t_x, index
+    order = np.argsort(rim[:, 0])
+    ts = rim[order, 0]
+    idx = _unwrap_index(rim[order, 4])
+    return t_x, float(np.interp(t_x, ts, idx)) % 37.0
 
 
 def bounce_spread(impacts, results, wheel=None) -> dict:

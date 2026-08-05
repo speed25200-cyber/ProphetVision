@@ -109,6 +109,39 @@ Fixtures : `tests/data/spins_rim.npz` (rebord, 5 tours) et
 - **51,2 %** : déroulé d'angle cassé, aucune calibration de roue.
 - **σ = 4,4 poches** : non reproductible avec le code du dépôt.
 
+## TEST HORS ÉCHANTILLON (2026-08-05) — vidéo 2, 6 tours
+
+Calibration **figée** sur la vidéo 1 (échelle 1,0584, ω_transfert 93,6, ellipse,
+seuil d'abstention). Rien réajusté. Résultats **bout-en-bout** (seuls honnêtes ;
+le budget en quadrature sous-estime).
+
+| | v1 | v2 (aveugle) | poolé |
+|---|---|---|---|
+| mesurables | 5/5 | **4/6** | 9/11 |
+| σ bout-en-bout | 12,66 | **5,44** | **8,47** poches |
+| 18 jetons | 55,0 % | 90,2 % | **71,3 %** |
+| Rayleigh p | 0,98 | 0,19 | **0,43** |
+
+**+22,7 points sur le hasard en poolé, mais p = 0,43 → non significatif.**
+
+Trois leçons, toutes défavorables au discours d'avant :
+1. **2 tours sur 6 non mesurables** : la plongée arrive après la descente de la
+   bille, aucun arc pour ancrer la référence. Défaut de couverture.
+2. **L'abstention n'a rien filtré** (4 tours, concentration > 0,97) : son
+   pouvoir de tri reste NON TESTÉ, pas confirmé.
+3. **Le budget en quadrature était optimiste** : v1 bout-en-bout = 12,66 poches
+   contre 7,88 annoncé par σ_pred ⊕ σ_scatter. Ne plus publier de quadrature.
+
+Bug corrigé grâce à la v2 (s'applique aux deux) : `transfer_point` ne lisait la
+vitesse que sur la piste descendante finale ; les trous de détection coupent la
+course en plusieurs pistes et le franchissement peut tomber dans un trou (tour
+116,50 : 118 °/s → trou 1 s → 84 °/s). Chaque piste donne maintenant un point
+(t, ω) et la loi est ajustée à travers eux. Les instants de transfert de la v1
+ont bougé de −0,27 à +0,03 s ; tous les chiffres v1 ont été re-dérivés.
+
+Fixtures : `tests/data/video2_rounds.npz` (6 tours v2),
+`tests/test_video2_out_of_sample.py`.
+
 ## AMÉLIORATION (2026-08-04, v3) — abstention : 70 % sur 18 jetons
 
 **Le vote circulaire aliasait.** Sur une fenêtre de T secondes, deux vitesses
