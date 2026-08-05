@@ -81,8 +81,11 @@ jobs:
           }' > slices.txt
           cat slices.txt
 
+          # -nostdin matters: without it ffmpeg swallows the rest of
+          # slices.txt from the loop's stdin and the next iteration gets a
+          # filename where -ss expects a timestamp.
           while read -r a b name; do
-            ffmpeg -y -ss "$a" -to "$b" -i original.mov -c:v libx264 \
+            ffmpeg -nostdin -y -ss "$a" -to "$b" -i original.mov -c:v libx264 \
               -preset slow -crf 14 -profile:v main -pix_fmt yuv420p -an "$name"
           done < slices.txt
           ls -la hq_*.mp4
