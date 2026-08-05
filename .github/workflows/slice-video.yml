@@ -71,15 +71,14 @@ jobs:
           if [ -z "$END" ]; then END=$DUR; fi
           echo "duration=$DUR slicing $BEG..$END in ${WIN}s windows"
 
-          python3 - "$BEG" "$END" "$WIN" > slices.txt <<'PY'
-          import sys
-          beg, end, win = float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3])
-          t = beg
-          while t < end:
-              hi = min(t + win, end)
-              print(f"{t:.2f} {hi:.2f} hq_{int(t):04d}_{int(hi):04d}.mp4")
-              t = hi
-          PY
+          # awk, not a heredoc: a Python heredoc indented inside YAML keeps
+          # its leading spaces and Python rejects them.
+          awk -v beg="$BEG" -v end="$END" -v win="$WIN" 'BEGIN{
+            for (t = beg; t < end; t += win) {
+              hi = (t + win < end) ? t + win : end;
+              printf "%.2f %.2f hq_%04d_%04d.mp4\n", t, hi, t, hi;
+            }
+          }' > slices.txt
           cat slices.txt
 
           while read -r a b name; do
