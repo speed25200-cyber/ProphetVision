@@ -71,6 +71,12 @@ qualité**. C'est fait, sur les 9 tours mesurables des deux vidéos :
 | NMB + 0,75 s (référence) | 6 / 9 | 0,71 s | 8,4 poches | 71,6 % |
 | **NMB − 1,00 s** | **5 / 9** | **0,70 s** | **8,26 poches** | **72,5 %** |
 
+« NMB−1 » signifie : la prédiction est émise **1 seconde avant** le
+« No More Bets » du croupier. C'est l'instant d'émission **par défaut du
+programme** : `earlyside.emit(detections, nmb, decay)` coupe les données à
+`nmb − 1,0` (`EMISSION_DELTA_S = −1,0`) et applique la porte de confiance
+(`Emission.played`).
+
 La qualité tient à **tous** les seuils intermédiaires (0,70-0,88 s de NMB+0,75
 à NMB−1) : une politique d'émission peut choisir n'importe quel instant de
 cette plage. En direct, aucune clairvoyance n'est requise : le système maintient

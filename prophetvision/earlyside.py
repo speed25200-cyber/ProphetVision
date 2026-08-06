@@ -463,6 +463,80 @@ class TransferCalibration:
         return float(cutoff) + self.remaining(omega_at_cutoff)
 
 
+#: When the prediction is emitted, in seconds relative to the croupier's
+#: "no more bets" — negative means BEFORE the call. One second before is the
+#: operating point: quality there matches the post-NMB reference (0.70 s rms
+#: against 0.71), and the cost curve in ``tests/test_pre_nmb_emission.py``
+#: shows coverage collapsing past NMB-1.25 because the ball is only launched
+#: around NMB-3.
+EMISSION_DELTA_S = -1.0
+
+#: The ball is launched about three seconds before "no more bets"; detections
+#: earlier than that are clutter by construction, so the fit window opens there.
+EMISSION_WINDOW_S = 3.0
+
+#: Radial band (fractions of the pocket-plane ellipse) and detector confidence
+#: floor of the emission pipeline, as validated on the nine rounds of both
+#: reference videos. The NMB-1 result is insensitive to both.
+EMISSION_BAND = (1.00, 1.40)
+EMISSION_MIN_CONF = 0.08
+
+
+@dataclass
+class Emission:
+    """The prediction state at the emission instant.
+
+    ``played`` says whether a live system bets on this round; the same gate
+    must also decide which rounds feed :class:`TransferCalibration` — fitting
+    the calibration across gate-rejected rounds is what previously destroyed
+    the pre-NMB quality (0.70 s rms with the gate, 1.14 s without).
+    """
+
+    cutoff: float
+    omega_at_cutoff: float
+    estimate: SpeedEstimate
+
+    @property
+    def played(self) -> bool:
+        return self.estimate.trustworthy()
+
+    def remaining(self, calibration: TransferCalibration) -> float:
+        return calibration.remaining(self.omega_at_cutoff)
+
+    def transfer_time(self, calibration: TransferCalibration) -> float:
+        return calibration.transfer_time(self.cutoff, self.omega_at_cutoff)
+
+
+def emit(detections, nmb: float, decay: WheelDecay,
+         delta: float = EMISSION_DELTA_S,
+         band=EMISSION_BAND, min_conf: float = EMISSION_MIN_CONF,
+         window: float = EMISSION_WINDOW_S) -> Emission | None:
+    """Emit the prediction, by default one second BEFORE "no more bets".
+
+    ``detections`` is an (N, 4+) array of [t, wheel azimuth deg, r, conf]
+    (see :mod:`prophetvision.sidetrack` for the de-projection). Returns
+    ``None`` when the round has too few usable detections to fit at all;
+    otherwise an :class:`Emission` whose ``played`` flag applies the
+    confidence gate. This is the validated pre-NMB pipeline — the numbers it
+    reproduces are pinned in ``tests/test_pre_nmb_emission.py``.
+    """
+    cutoff = nmb + delta
+    a = np.asarray(detections, dtype=float)
+    a = a[(a[:, 0] >= nmb - window) & (a[:, 0] <= cutoff)
+          & (a[:, 2] >= band[0]) & (a[:, 2] < band[1])
+          & (a[:, 3] >= min_conf)]
+    a = a[np.argsort(a[:, 0])]
+    if len(a) >= 10:
+        a = a[reject_static(a[:, 0], a[:, 1])]
+    if len(a) < 12:
+        return None
+    est = fit_speed_gated(a[:, 0], a[:, 1], decay, weights=a[:, 3])
+    return Emission(
+        cutoff=cutoff,
+        omega_at_cutoff=float(decay.speed_after(est.omega0, cutoff - a[0, 0])),
+        estimate=est)
+
+
 def predict_early(detections, cutoff: float, decay: WheelDecay,
                   rotor: RotorModel, r_band=(1.00, 1.40),
                   min_conf: float = 0.45, t_start: float | None = None,

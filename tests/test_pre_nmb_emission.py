@@ -30,16 +30,14 @@ import math
 import numpy as np
 import pytest
 
-from prophetvision.earlyside import (OMEGA_TRANSFER_DEG_S, TransferCalibration,
-                                     WheelDecay, fit_speed_gated)
+from prophetvision.earlyside import (EMISSION_DELTA_S, OMEGA_TRANSFER_DEG_S,
+                                     TransferCalibration, WheelDecay, emit)
 from prophetvision.impactmeas import bounce_spread
-from prophetvision.sidetrack import reject_static
 from prophetvision.zone import wrapped_normal_coverage
 
 DATA = __file__.rsplit("/", 1)[0] + "/data/prenmb_side.npz"
 DECAY = WheelDecay(c0=17.5266174, c2=1.99170412e-4)
 POCKET = 360.0 / 37
-BAND, MIN_CONF = (1.00, 1.40), 0.08
 
 
 @pytest.fixture(scope="module")
@@ -55,29 +53,14 @@ def rounds():
     return out
 
 
-def _fit(r, delta):
-    cutoff = r["nmb"] + delta
-    a = r["rows"]
-    a = a[(a[:, 0] >= r["nmb"] - 3.0) & (a[:, 0] <= cutoff)
-          & (a[:, 2] >= BAND[0]) & (a[:, 2] < BAND[1])
-          & (a[:, 3] >= MIN_CONF)]
-    if len(a) >= 10:
-        a = a[reject_static(a[:, 0], a[:, 1])]
-    if len(a) < 12:
-        return None
-    est = fit_speed_gated(a[:, 0], a[:, 1], DECAY, weights=a[:, 3])
-    return (DECAY.speed_after(est.omega0, cutoff - a[0, 0]), est)
-
-
 def _loo(rounds, delta, gated=True):
     W, REM, keep = {}, {}, []
     for n, r in rounds.items():
-        out = _fit(r, delta)
-        if out is None:
+        em = emit(r["rows"], r["nmb"], DECAY, delta=delta)
+        if em is None:
             continue
-        w, est = out
-        W[n], REM[n] = w, r["t_meas"] - (r["nmb"] + delta)
-        if est.trustworthy() or not gated:
+        W[n], REM[n] = em.omega_at_cutoff, r["t_meas"] - em.cutoff
+        if em.played or not gated:
             keep.append(n)
     errs = {}
     for n in keep:
@@ -86,6 +69,20 @@ def _loo(rounds, delta, gated=True):
                                       [REM[k] for k in tr], DECAY)
         errs[n] = cal.remaining(W[n]) - REM[n]
     return errs
+
+
+def test_the_program_emits_one_second_before_nmb_by_default(rounds):
+    """NMB-1 means one second BEFORE "no more bets", and it is the program's
+    default, not a test-only setting: `emit(rows, nmb, decay)` with no delta
+    cuts the data at nmb - 1.0 and reproduces the pinned operating point."""
+    assert EMISSION_DELTA_S == -1.0
+    r = rounds["spinA"]
+    em = emit(r["rows"], r["nmb"], DECAY)
+    assert em is not None
+    assert em.cutoff == pytest.approx(r["nmb"] - 1.0)
+    explicit = emit(r["rows"], r["nmb"], DECAY, delta=-1.0)
+    assert em.omega_at_cutoff == explicit.omega_at_cutoff
+    assert em.played == explicit.played
 
 
 def test_gated_quality_at_nmb_minus_one_matches_the_reference(rounds):
@@ -105,12 +102,11 @@ def test_the_gate_must_protect_the_calibration_not_just_the_bet(rounds):
     only the calibration pool changes."""
     W, REM, gat = {}, {}, []
     for n, r in rounds.items():
-        out = _fit(r, -1.00)
-        if out is None:
+        em = emit(r["rows"], r["nmb"], DECAY)
+        if em is None:
             continue
-        w, est = out
-        W[n], REM[n] = w, r["t_meas"] - (r["nmb"] - 1.00)
-        if est.trustworthy():
+        W[n], REM[n] = em.omega_at_cutoff, r["t_meas"] - em.cutoff
+        if em.played:
             gat.append(n)
 
     def rms(pool):

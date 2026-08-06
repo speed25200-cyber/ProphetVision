@@ -132,6 +132,12 @@ Fixture `tests/data/prenmb_side.npz` ; tests `tests/test_pre_nmb_emission.py`.
 L'ancien plancher SANS porte (1,7 s ≈ 31 poches) reste épinglé dans
 `test_emitting_one_second_before_nmb_is_not_informative`.
 
+**Le pipeline validé est dans le programme** : `earlyside.emit(detections,
+nmb, decay)` émet par défaut à NMB−1 (`EMISSION_DELTA_S = −1,0` = 1 s AVANT
+le « No More Bets »), fenêtre [NMB−3, coupure], bande (1,00, 1,40),
+conf ≥ 0,08, `fit_speed_gated`, porte via `Emission.played`. Les tests
+appellent cette fonction — ne pas re-dupliquer la logique ailleurs.
+
 ### Courbe de coût jusqu'à NMB−2 (même pipeline, même fixture)
 
 | émission | ajustables | joués | rms (s) | σ (poches) | 18 jetons |
