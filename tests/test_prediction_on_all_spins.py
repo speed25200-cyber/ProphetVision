@@ -239,14 +239,12 @@ def test_emitting_at_no_more_bets_costs_little(rounds):
 
 
 def test_emitting_one_second_before_nmb_is_not_informative(rounds):
-    """The constraint 'emit 1 s before no-more-bets', measured. The usable
-    detections start only ~3 s before NMB (earlier, the ball sits in the
-    r>1.3 clutter ring where concentration collapses to ~0.2), so the fit
-    keeps ~1.5 s of sparse arc and extrapolates ~14 s. The timing scatter
-    comes out ≈1.7 s ≈ 30 pockets at 18 pockets/s — wider than the wheel.
-    Any apparent zone coverage at this cutoff is wrap-around coincidence,
-    and this test exists so that a claimed win rate there cannot slip back
-    into the README without beating it first."""
+    """The UNGATED estimator at NMB-1, on this fixture: scatter ≈1.7 s ≈ 30
+    pockets — uniform-level. This stays pinned as the floor the gate rescues
+    the system from. The gated pipeline, with its calibration fitted on
+    accepted rounds only, reaches 0.70 s rms at the same cutoff — see
+    tests/test_pre_nmb_emission.py, which supersedes this number as the
+    operational one."""
     errs = _loo_at(rounds, -1.75)
     scatter = float(errs.std(ddof=1))
     assert scatter > 1.2

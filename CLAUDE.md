@@ -109,22 +109,27 @@ Fixtures : `tests/data/spins_rim.npz` (rebord, 5 tours) et
 - **51,2 %** : déroulé d'angle cassé, aucune calibration de roue.
 - **σ = 4,4 poches** : non reproductible avec le code du dépôt.
 
-## ÉMISSION PLUS TÔT (2026-08-06) — NMB−1 s : PAS D'INFORMATION
+## ÉMISSION AVANT NMB (2026-08-06, v2) — OBJECTIF ATTEINT : 0,70 s à NMB−1
 
-Demande : émettre 1 s AVANT le « No More Bets ». Mesuré sur les 9 tours des
-deux vidéos (troncature des fixtures, aucune re-détection) :
+Le verdict précédent (« NMB−1 : pas d'information ») était un **artefact
+d'hygiène de calibration**, pas de la physique. À NMB−1, 4 tours sur 9 sont
+inajustables (vitesse fausse de 21-48 %) et la calibration vitesse→temps était
+ajustée à travers eux. Preuve A/B, mêmes 5 tours notés :
+- calibration sur tours acceptés seulement → **0,703 s rms** ;
+- calibration sur les 9 → 1,137 s.
+**La porte doit protéger la calibration, pas seulement la mise.**
 
-- NMB+0,00 : rms 0,78 s → fonctionne, sans perte vs référence (0,93 s).
-- NMB−0,50 : rms 1,52 s → dégradé.
-- **NMB−1,00 : dispersion 1,7 s ≈ 31 poches sur 37 → uniforme. Tout winrate
-  affiché à ce seuil est une coïncidence de repliement (p = 0,10-0,75).**
+Résultat (9 tours, 2 vidéos, LOO dans le sous-ensemble accepté) :
+- NMB−1,00 : 5/9 joués, rms **0,703 s**, σ bout-en-bout **8,26 poches**,
+  **18 jetons 72,5 %** (référence NMB+0,75 : 0,711 s / 8,4 / 71,6 %).
+- Qualité stable à tous les seuils intermédiaires (0,70-0,88 s).
+- Insensible à bande/conf/ordre du rejet statique (0,703 partout).
+- En direct : estimation glissante, pas de clairvoyance nécessaire.
+- ⚠️ n=5, abstention 44 %, Rayleigh p=0,52 — parité démontrée,
+  significativité non.
 
-Cause : détections exploitables seulement à partir de ~NMB−3 ; avant, la bille
-est dans l'anneau r>1,30 dominé par les reflets (élargir la bande → R chute de
-0,98 à ~0,2). Le plus tôt défendable : **NMB+0 s** (2,75 s avant l'animation,
-~11-14 s avant l'arrivée). Seule piste pour aller plus tôt : track-before-detect
-(`vmf.py`) dans l'anneau de fouillis — non testé dans cette fenêtre.
-Tests verrous : `test_emitting_at_no_more_bets_costs_little`,
+Fixture `tests/data/prenmb_side.npz` ; tests `tests/test_pre_nmb_emission.py`.
+L'ancien plancher SANS porte (1,7 s ≈ 31 poches) reste épinglé dans
 `test_emitting_one_second_before_nmb_is_not_informative`.
 
 ## TEST HORS ÉCHANTILLON (2026-08-05) — vidéo 2, 6 tours

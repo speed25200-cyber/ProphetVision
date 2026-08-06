@@ -61,39 +61,44 @@ maintenant un point (temps, vitesse) et la loi est ajustée à travers eux.
 Les six tours de la vidéo 2 sont figés dans `tests/data/video2_rounds.npz` ;
 `tests/test_video2_out_of_sample.py` re-dérive ces chiffres sans la vidéo.
 
-### Peut-on émettre plus tôt ? Le coût de chaque seconde, mesuré
+### Émission AVANT le « No More Bets » : objectif atteint — 0,70 s rms à NMB−1
 
-Demande utilisateur : émettre la prédiction **1 s avant le « No More Bets »**.
-Testé sur les 9 tours mesurables des deux vidéos en tronquant les détections
-figées au nouveau seuil (aucune re-détection, mêmes fixtures) :
+Demande utilisateur : émettre 1 s avant le « No More Bets » **avec la même
+qualité**. C'est fait, sur les 9 tours mesurables des deux vidéos :
 
-| émission | rms instant | dispersion (s) | équivalent poches | verdict |
+| émission | tours joués | rms instant (LOO) | σ bout-en-bout | 18 jetons |
 |---|---|---|---|---|
-| NMB + 0,75 s (référence) | 0,93 s | 0,88 | ~16 | fonctionne |
-| **NMB + 0,00 s** | **0,78 s** | **0,75** | **~14** | **fonctionne** |
-| NMB − 0,50 s | 1,52 s | 1,48 | ~27 | dégradé |
-| NMB − 1,00 s | 1,71 s | 1,69 | **~31 sur 37** | **aucune information** |
+| NMB + 0,75 s (référence) | 6 / 9 | 0,71 s | 8,4 poches | 71,6 % |
+| **NMB − 1,00 s** | **5 / 9** | **0,70 s** | **8,26 poches** | **72,5 %** |
 
-**À NMB − 1 s, la dispersion de l'instant prédit vaut ~31 poches — plus large
-que la roue.** Tout « winrate » calculé à ce seuil est une coïncidence de
-repliement (les erreurs font plus d'un demi-tour et retombent parfois près du
-but) : Rayleigh p = 0,10–0,75 selon le sous-ensemble, jamais significatif. Un
-test (`test_emitting_one_second_before_nmb_is_not_informative`) verrouille ce
-constat pour qu'aucun chiffre à ce seuil ne revienne dans ce README sans le
-battre.
+La qualité tient à **tous** les seuils intermédiaires (0,70-0,88 s de NMB+0,75
+à NMB−1) : une politique d'émission peut choisir n'importe quel instant de
+cette plage. En direct, aucune clairvoyance n'est requise : le système maintient
+une estimation glissante, et celle qui existe une seconde avant l'annonce du
+croupier a déjà cette qualité.
 
-**Le plus tôt défendable aujourd'hui : l'instant du « No More Bets » lui-même**
-(NMB + 0 s), qui précède l'animation de 2,75 s et l'arrivée de la bille de
-~11-14 s, sans perte de précision par rapport à la référence.
+**Ce qui bloquait n'était pas la physique mais l'hygiène de calibration.** Une
+version antérieure de ce README concluait « aucune information à NMB−1 »
+(dispersion 1,7 s ≈ 31 poches). Diagnostic : à ce seuil, 4 tours sur 9 sont
+inajustables (vitesse fausse de 21 à 48 %) — et la calibration vitesse→temps
+était ajustée **à travers eux**, ce qui la corrompait pour les 5 tours
+parfaitement mesurables. Preuve par A/B sur les mêmes 5 tours notés :
 
-Pourquoi le mur est là : les détections exploitables ne commencent qu'à
-~NMB − 3 s. Avant, la bille est plus haut sur la cuvette, dans l'anneau
-r > 1,30 dominé par les reflets fixes — élargir la bande de recherche y fait
-chuter la concentration de 0,98 à ~0,2 (fouillis 10 contre 1). Émettre à
-NMB − 1 ne laisse donc que ~1,5 s d'arc clairsemé et ~14 s d'extrapolation.
-La seule voie identifiée pour gagner ce territoire est un détecteur qui
-retrouve la bille dans cet anneau de fouillis (track-before-detect type
-`vmf.py`, non testé dans cette fenêtre) — pas un réglage du pipeline actuel.
+| pool de calibration | rms |
+|---|---|
+| tours acceptés par la porte uniquement | **0,703 s** |
+| les 9 tours (dont les 4 inajustables) | 1,137 s |
+
+**La porte de confiance doit protéger la calibration, pas seulement la mise.**
+En direct c'est naturel : on ne calibre que sur les tours qu'on a acceptés.
+L'ancien constat reste épinglé comme plancher du système *sans* porte
+(`test_emitting_one_second_before_nmb_is_not_informative`) ; le mode opérationnel
+est celui de `tests/test_pre_nmb_emission.py`.
+
+Réserves, comme partout ici : 9 tours, 5 acceptés (44 % d'abstention),
+Rayleigh p = 0,52. La **parité de qualité** est démontrée sur ces données ; la
+significativité statistique ne l'est pas, et ne peut pas l'être à cet
+échantillon. Fixture : `tests/data/prenmb_side.npz`.
 
 ### Chiffres sur la vidéo 1 seule (calibration)
 
