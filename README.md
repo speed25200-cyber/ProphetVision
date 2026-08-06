@@ -100,6 +100,28 @@ Rayleigh p = 0,52. La **parité de qualité** est démontrée sur ces données ;
 significativité statistique ne l'est pas, et ne peut pas l'être à cet
 échantillon. Fixture : `tests/data/prenmb_side.npz`.
 
+### Encore plus tôt ? La courbe de coût jusqu'à NMB−2
+
+Demande suivante : reculer l'émission d'une seconde de plus. Mesuré avec le
+même pipeline sur la même fixture :
+
+| émission | ajustables | joués | rms (s) | σ bout-en-bout | 18 jetons |
+|---|---|---|---|---|---|
+| NMB − 1,00 | 9 | 5 | 0,686 | 8,40 | 71,7 % |
+| **NMB − 1,25** | **9** | **5** | **0,704** | **9,37** | **66,6 %** |
+| NMB − 1,50 | 7 | 4 | 0,777 | 11,48 | 58,2 % |
+| NMB − 1,75 | 7 | 4 | 0,774 | 11,11 | 59,4 % |
+| NMB − 2,00 | 4 | 4 | 0,728 | 10,37 | 62,1 % |
+
+Le rms **tient** (< 0,8 s) jusqu'à NMB−2 sur les tours encore ajustables :
+la dégradation n'est pas la précision, c'est la **couverture**. La bille n'est
+lancée que vers NMB−3, donc à NMB−2 l'arc mesurable fait moins d'une seconde
+et le nombre de tours ajustables s'effondre de 9 à 4. Les σ et taux des lignes
+à 4 tours sont trop bruités pour être publiés seuls. **Mur physique : NMB−3**
+— aucune prédiction fondée sur la bille ne peut exister avant que la bille
+existe. Dernier instant à qualité pleine : **NMB−1,25** (5/9 joués, 66,6 % à
+18 jetons). Épinglé dans `test_the_cost_curve_back_to_nmb_minus_two`.
+
 ### Chiffres sur la vidéo 1 seule (calibration)
 
 Validation croisée leave-one-out, cinq tours :

@@ -165,3 +165,22 @@ def test_the_abstention_rate_is_reported_not_hidden(rounds):
     gated = _loo(rounds, -1.00, gated=True)
     assert len(all_fits) == 9
     assert len(gated) == 5
+
+
+def test_the_cost_curve_back_to_nmb_minus_two(rounds):
+    """How far back can the emission go? The timing rms holds reference grade
+    (< 0.8 s) all the way to NMB-2 on the rounds that still fit — but the
+    number of rounds that fit at all falls from 9 to 4, because the ball is
+    only launched around NMB-3 and at NMB-2 the measurable arc is under a
+    second. The degradation mode is coverage, not accuracy: fewer playable
+    rounds, not worse predictions on the playable ones. No ball-based
+    prediction can exist before the ball does, so NMB-3 is the hard wall."""
+    fitted_at = {}
+    for delta in (-1.0, -1.25, -1.5, -2.0):
+        errs = _loo(rounds, delta)
+        fitted_at[delta] = len(errs)
+        if len(errs) >= 3:
+            rms = math.sqrt(np.mean(np.square(list(errs.values()))))
+            assert rms < 0.80, (delta, rms)
+    assert fitted_at[-1.0] == 5
+    assert fitted_at[-2.0] <= 4        # coverage is what collapses

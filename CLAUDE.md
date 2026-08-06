@@ -132,6 +132,25 @@ Fixture `tests/data/prenmb_side.npz` ; tests `tests/test_pre_nmb_emission.py`.
 L'ancien plancher SANS porte (1,7 s ≈ 31 poches) reste épinglé dans
 `test_emitting_one_second_before_nmb_is_not_informative`.
 
+### Courbe de coût jusqu'à NMB−2 (même pipeline, même fixture)
+
+| émission | ajustables | joués | rms (s) | σ (poches) | 18 jetons |
+|---|---|---|---|---|---|
+| NMB−1,00 | 9 | 5 | 0,686 | 8,40 | 71,7 % |
+| NMB−1,25 | 9 | 5 | 0,704 | 9,37 | 66,6 % |
+| NMB−1,50 | 7 | 4 | 0,777 | 11,48 | 58,2 % |
+| NMB−1,75 | 7 | 4 | 0,774 | 11,11 | 59,4 % |
+| NMB−2,00 | 4 | 4 | 0,728 | 10,37 | 62,1 % |
+
+**Le mode de dégradation est la COUVERTURE, pas la précision** : le rms tient
+< 0,8 s jusqu'à NMB−2 sur les tours qui s'ajustent encore, mais le nombre de
+tours ajustables s'effondre (9 → 4) parce que la bille n'est lancée que vers
+NMB−3 — à NMB−2 l'arc mesurable fait moins d'une seconde. Les σ et taux à
+n = 4 sont bruités, ne pas les publier seuls. **Mur physique : NMB−3**
+(aucune prédiction fondée sur la bille n'existe avant la bille).
+Dernier instant à qualité pleine : **NMB−1,25**. Épinglé dans
+`test_the_cost_curve_back_to_nmb_minus_two`.
+
 ## TEST HORS ÉCHANTILLON (2026-08-05) — vidéo 2, 6 tours
 
 Calibration **figée** sur la vidéo 1 (échelle 1,0584, ω_transfert 93,6, ellipse,
