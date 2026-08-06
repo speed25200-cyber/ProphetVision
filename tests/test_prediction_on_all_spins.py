@@ -203,3 +203,51 @@ def test_gating_more_than_halves_the_prediction_error(gated):
     rms_all = float(np.sqrt((_loo_errors(w_all, rem_all) ** 2).mean()))
     rms_acc = float(np.sqrt((_loo_errors(w_acc, rem_acc) ** 2).mean()))
     assert rms_acc < rms_all / 2.0
+
+
+# --- earlier emission: the user's constraint, measured -----------------------
+
+def _loo_at(rounds, delta):
+    """LOO timing errors with the cutoff shifted by ``delta`` seconds."""
+    from prophetvision.earlyside import fit_speed_gated
+    W, REM = {}, {}
+    for n, (rows, cutoff, meas) in rounds.items():
+        c = cutoff + delta
+        s = rows[rows[:, 0] <= c]
+        if len(s) < 12:
+            continue
+        est = fit_speed_gated(s[:, 0], s[:, 1], DECAY, weights=s[:, 3])
+        W[n] = DECAY.speed_after(est.omega0, c - s[0, 0])
+        REM[n] = meas - c
+    names = list(W)
+    errs = []
+    for n in names:
+        tr = [k for k in names if k != n]
+        cal = TransferCalibration.fit([W[k] for k in tr],
+                                      [REM[k] for k in tr], DECAY)
+        errs.append(cal.remaining(W[n]) - REM[n])
+    return np.array(errs)
+
+
+def test_emitting_at_no_more_bets_costs_little(rounds):
+    """Moving the emission 0.75 s earlier — to the 'no more bets' transition
+    itself — keeps the timing error at the reference level. The prediction
+    does not need the post-NMB data."""
+    ref = float(np.sqrt((_loo_at(rounds, 0.0) ** 2).mean()))
+    at_nmb = float(np.sqrt((_loo_at(rounds, -0.75) ** 2).mean()))
+    assert at_nmb < ref + 0.25
+
+
+def test_emitting_one_second_before_nmb_is_not_informative(rounds):
+    """The constraint 'emit 1 s before no-more-bets', measured. The usable
+    detections start only ~3 s before NMB (earlier, the ball sits in the
+    r>1.3 clutter ring where concentration collapses to ~0.2), so the fit
+    keeps ~1.5 s of sparse arc and extrapolates ~14 s. The timing scatter
+    comes out ≈1.7 s ≈ 30 pockets at 18 pockets/s — wider than the wheel.
+    Any apparent zone coverage at this cutoff is wrap-around coincidence,
+    and this test exists so that a claimed win rate there cannot slip back
+    into the README without beating it first."""
+    errs = _loo_at(rounds, -1.75)
+    scatter = float(errs.std(ddof=1))
+    assert scatter > 1.2
+    assert scatter * RELATIVE_RATE > 20.0     # pockets: uniform-level

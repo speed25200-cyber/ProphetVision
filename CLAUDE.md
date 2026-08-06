@@ -109,6 +109,24 @@ Fixtures : `tests/data/spins_rim.npz` (rebord, 5 tours) et
 - **51,2 %** : déroulé d'angle cassé, aucune calibration de roue.
 - **σ = 4,4 poches** : non reproductible avec le code du dépôt.
 
+## ÉMISSION PLUS TÔT (2026-08-06) — NMB−1 s : PAS D'INFORMATION
+
+Demande : émettre 1 s AVANT le « No More Bets ». Mesuré sur les 9 tours des
+deux vidéos (troncature des fixtures, aucune re-détection) :
+
+- NMB+0,00 : rms 0,78 s → fonctionne, sans perte vs référence (0,93 s).
+- NMB−0,50 : rms 1,52 s → dégradé.
+- **NMB−1,00 : dispersion 1,7 s ≈ 31 poches sur 37 → uniforme. Tout winrate
+  affiché à ce seuil est une coïncidence de repliement (p = 0,10-0,75).**
+
+Cause : détections exploitables seulement à partir de ~NMB−3 ; avant, la bille
+est dans l'anneau r>1,30 dominé par les reflets (élargir la bande → R chute de
+0,98 à ~0,2). Le plus tôt défendable : **NMB+0 s** (2,75 s avant l'animation,
+~11-14 s avant l'arrivée). Seule piste pour aller plus tôt : track-before-detect
+(`vmf.py`) dans l'anneau de fouillis — non testé dans cette fenêtre.
+Tests verrous : `test_emitting_at_no_more_bets_costs_little`,
+`test_emitting_one_second_before_nmb_is_not_informative`.
+
 ## TEST HORS ÉCHANTILLON (2026-08-05) — vidéo 2, 6 tours
 
 Calibration **figée** sur la vidéo 1 (échelle 1,0584, ω_transfert 93,6, ellipse,

@@ -61,6 +61,40 @@ maintenant un point (temps, vitesse) et la loi est ajustée à travers eux.
 Les six tours de la vidéo 2 sont figés dans `tests/data/video2_rounds.npz` ;
 `tests/test_video2_out_of_sample.py` re-dérive ces chiffres sans la vidéo.
 
+### Peut-on émettre plus tôt ? Le coût de chaque seconde, mesuré
+
+Demande utilisateur : émettre la prédiction **1 s avant le « No More Bets »**.
+Testé sur les 9 tours mesurables des deux vidéos en tronquant les détections
+figées au nouveau seuil (aucune re-détection, mêmes fixtures) :
+
+| émission | rms instant | dispersion (s) | équivalent poches | verdict |
+|---|---|---|---|---|
+| NMB + 0,75 s (référence) | 0,93 s | 0,88 | ~16 | fonctionne |
+| **NMB + 0,00 s** | **0,78 s** | **0,75** | **~14** | **fonctionne** |
+| NMB − 0,50 s | 1,52 s | 1,48 | ~27 | dégradé |
+| NMB − 1,00 s | 1,71 s | 1,69 | **~31 sur 37** | **aucune information** |
+
+**À NMB − 1 s, la dispersion de l'instant prédit vaut ~31 poches — plus large
+que la roue.** Tout « winrate » calculé à ce seuil est une coïncidence de
+repliement (les erreurs font plus d'un demi-tour et retombent parfois près du
+but) : Rayleigh p = 0,10–0,75 selon le sous-ensemble, jamais significatif. Un
+test (`test_emitting_one_second_before_nmb_is_not_informative`) verrouille ce
+constat pour qu'aucun chiffre à ce seuil ne revienne dans ce README sans le
+battre.
+
+**Le plus tôt défendable aujourd'hui : l'instant du « No More Bets » lui-même**
+(NMB + 0 s), qui précède l'animation de 2,75 s et l'arrivée de la bille de
+~11-14 s, sans perte de précision par rapport à la référence.
+
+Pourquoi le mur est là : les détections exploitables ne commencent qu'à
+~NMB − 3 s. Avant, la bille est plus haut sur la cuvette, dans l'anneau
+r > 1,30 dominé par les reflets fixes — élargir la bande de recherche y fait
+chuter la concentration de 0,98 à ~0,2 (fouillis 10 contre 1). Émettre à
+NMB − 1 ne laisse donc que ~1,5 s d'arc clairsemé et ~14 s d'extrapolation.
+La seule voie identifiée pour gagner ce territoire est un détecteur qui
+retrouve la bille dans cet anneau de fouillis (track-before-detect type
+`vmf.py`, non testé dans cette fenêtre) — pas un réglage du pipeline actuel.
+
 ### Chiffres sur la vidéo 1 seule (calibration)
 
 Validation croisée leave-one-out, cinq tours :
